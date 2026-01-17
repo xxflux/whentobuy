@@ -32,7 +32,15 @@ Please provide your analysis in the following format:
 1. **Market Sentiment Score**: (0-100, where 100 is extremely bullish/buy now)
 2. **Best Timing**: (e.g., Buy now, Wait 6 months, etc.)
 3. **Regional Focus ({region})**: (Specific insights about {region} vs the overall Las Vegas market)
-4. **Strategic Reasoning**: (Brief explanation of why, considering the 5-6 year hold period and the current political climate/policy changes)`;
+4. **Strategic Reasoning**: (Brief explanation of why, considering the 5-6 year hold period and the current political climate/policy changes)
+
+At the end of your response, include a JSON metadata block in the following format (this is required for data storage):
+\`\`\`json
+{
+  "market_sentiment_score": <number 0-100>,
+  "best_timing": "<text description>"
+}
+\`\`\``;
 
 async function getPromptTemplate(): Promise<string> {
   try {

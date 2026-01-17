@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Badge, Button, Spinner, Tabs, TabsList, TabsTrigger, Dialog, DialogContent, DialogTrigger } from '@/common/ui';
+import { Badge, Button, Spinner, Tabs, TabsList, TabsTrigger, TabsContent, Dialog, DialogContent, DialogTrigger } from '@/common/ui';
 import { MarketCard } from '@/common/components/market-card';
 import { 
   LineChart, 
@@ -223,7 +223,10 @@ export default function DashboardPage() {
   const [selectedRegion, setSelectedRegion] = useState('Las Vegas');
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptData, setPromptData] = useState<any>(null);
+  const [prefilledPrompt, setPrefilledPrompt] = useState<string>('');
   const [loadingPrompt, setLoadingPrompt] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<'prefilled' | 'template'>('prefilled');
   const [allRegionsZhvi, setAllRegionsZhvi] = useState<any[]>([]);
   const [loadingZhvi, setLoadingZhvi] = useState(true);
   const [allRegionsZori, setAllRegionsZori] = useState<any[]>([]);
@@ -234,6 +237,9 @@ export default function DashboardPage() {
   const [loadingListingsSales, setLoadingListingsSales] = useState(true);
   const [allRegionsForecasts, setAllRegionsForecasts] = useState<any[]>([]);
   const [loadingForecasts, setLoadingForecasts] = useState(true);
+  const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [recentAnalysis, setRecentAnalysis] = useState<any>(null);
 
   const regions = [
     'Las Vegas',
@@ -354,6 +360,51 @@ export default function DashboardPage() {
     fetchAllForecasts();
   }, []);
 
+  // Fetch analysis history and most recent analysis
+  useEffect(() => {
+    async function fetchAnalysisHistory() {
+      setLoadingHistory(true);
+      try {
+        const res = await fetch(`/api/analysis/history?region=${encodeURIComponent(selectedRegion)}&limit=20&t=${Date.now()}`, { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        });
+        const data = await res.json();
+        const historyData = data.data || [];
+        
+        // Debug: Log first item to see what we're getting
+        if (historyData.length > 0) {
+          console.log('[Analysis History] First item:', {
+            id: historyData[0].id,
+            sentiment: historyData[0].market_sentiment_score,
+            timing: historyData[0].best_timing,
+            hasFullAnalysis: !!historyData[0].full_analysis
+          });
+        }
+        
+        setAnalysisHistory(historyData);
+        
+        // Set the most recent analysis if available
+        if (historyData.length > 0) {
+          setRecentAnalysis(historyData[0]);
+          // If no current analysis is set, show the most recent one
+          if (!analysis) {
+            setAnalysis(historyData[0].full_analysis);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch analysis history:', error);
+      } finally {
+        setLoadingHistory(false);
+      }
+    }
+
+    fetchAnalysisHistory();
+  }, [selectedRegion]);
+
   const runAnalysis = async () => {
     setAnalyzing(true);
     try {
@@ -363,7 +414,11 @@ export default function DashboardPage() {
 
       const res = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        },
         body: JSON.stringify({
           marketMetrics: {
             ...marketData?.latest,
@@ -374,10 +429,42 @@ export default function DashboardPage() {
           },
           economicIndicators: marketData?.latest?.mortgage,
           recentNews: news.slice(0, 5).map(a => a.title)
-        })
+        }),
+        cache: 'no-store'
       });
       const data = await res.json();
       setAnalysis(data.analysis);
+      
+      // Log the parsed data to see what was extracted
+      if (data.parsed) {
+        console.log('[New Analysis] Parsed data:', data.parsed);
+      }
+      
+      // Refresh analysis history after new analysis (with cache busting)
+      try {
+        const historyRes = await fetch(`/api/analysis/history?region=${encodeURIComponent(selectedRegion)}&limit=20&t=${Date.now()}`, { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        });
+        const historyData = await historyRes.json();
+        console.log('[History Refresh] Received data:', {
+          count: historyData.data?.length,
+          firstItem: historyData.data?.[0] ? {
+            id: historyData.data[0].id,
+            sentiment: historyData.data[0].market_sentiment_score,
+            timing: historyData.data[0].best_timing
+          } : null
+        });
+        setAnalysisHistory(historyData.data || []);
+        if (historyData.data && historyData.data.length > 0) {
+          setRecentAnalysis(historyData.data[0]);
+        }
+      } catch (error) {
+        console.error('Failed to refresh analysis history:', error);
+      }
     } catch (error) {
       console.error('Analysis failed:', error);
       setAnalysis('Failed to generate analysis. Please check your API keys.');
@@ -1387,7 +1474,7 @@ export default function DashboardPage() {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* AI Analysis Card */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-card text-card-foreground rounded-xl border shadow-subtle-md overflow-hidden">
+            <div id="gemini-analysis" className="bg-card text-card-foreground rounded-xl border shadow-subtle-md overflow-hidden">
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -1418,6 +1505,36 @@ export default function DashboardPage() {
                           const res = await fetch('/api/prompts');
                           const data = await res.json();
                           setPromptData(data);
+                          
+                          // Prepare pre-filled prompt with actual data
+                          if (data?.prompt_template && marketData) {
+                            const history = marketData.history;
+                            const latest = marketData.latest;
+                            const displayZHVIValue = history?.zhvi?.length > 0 
+                              ? history.zhvi[history.zhvi.length - 1].value 
+                              : (latest?.zhvi || 0);
+                            
+                            const marketMetrics = {
+                              ...latest,
+                              region: selectedRegion,
+                              zhvi: displayZHVIValue,
+                              zori: latest?.zori,
+                              priceCuts: latest?.priceCuts
+                            };
+                            
+                            const economicIndicators = latest?.mortgage;
+                            const recentNews = news.slice(0, 5).map((a: any) => a.title);
+                            
+                            // Replace placeholders with actual data
+                            const prefilled = data.prompt_template
+                              .replace(/{region}/g, selectedRegion)
+                              .replace(/{marketMetrics}/g, JSON.stringify(marketMetrics, null, 2))
+                              .replace(/{economicIndicators}/g, JSON.stringify(economicIndicators, null, 2))
+                              .replace(/{recentNews}/g, JSON.stringify(recentNews, null, 2));
+                            
+                            setPrefilledPrompt(prefilled);
+                          }
+                          
                           setPromptOpen(true);
                         } catch (error) {
                           console.error('Failed to fetch prompt:', error);
@@ -1441,7 +1558,7 @@ export default function DashboardPage() {
                   <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
                     <DialogContent
                       ariaTitle="LLM Prompt Template"
-                      className="max-w-4xl max-h-[80vh] overflow-y-auto"
+                      className="max-w-5xl max-h-[85vh] overflow-y-auto"
                     >
                       <div className="space-y-4">
                         <div>
@@ -1458,20 +1575,84 @@ export default function DashboardPage() {
                             )}
                           </div>
                         </div>
-                        <div className="bg-muted/30 rounded-lg p-4 border">
-                          <pre className="whitespace-pre-wrap text-sm font-mono text-foreground">
-                            {promptData?.prompt_template || 'No prompt found'}
-                          </pre>
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <p><strong>Placeholders:</strong></p>
-                          <ul className="list-disc list-inside space-y-1 ml-2">
-                            <li><code>{'{region}'}</code> - Selected region name</li>
-                            <li><code>{'{marketMetrics}'}</code> - Market metrics JSON</li>
-                            <li><code>{'{economicIndicators}'}</code> - Economic indicators JSON</li>
-                            <li><code>{'{recentNews}'}</code> - Recent news articles JSON</li>
-                          </ul>
-                        </div>
+                        
+                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'prefilled' | 'template')} className="w-full">
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="prefilled">Pre-filled Prompt</TabsTrigger>
+                            <TabsTrigger value="template">Template Only</TabsTrigger>
+                          </TabsList>
+                          
+                          <TabsContent value="prefilled" className="mt-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm text-muted-foreground">
+                                  Prompt with actual data for <strong>{selectedRegion}</strong>
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outlined"
+                                  onClick={async () => {
+                                    try {
+                                      await navigator.clipboard.writeText(prefilledPrompt);
+                                      setCopied(true);
+                                      setTimeout(() => setCopied(false), 2000);
+                                    } catch (error) {
+                                      console.error('Failed to copy:', error);
+                                    }
+                                  }}
+                                  className="h-8"
+                                >
+                                  {copied ? '✓ Copied!' : 'Copy'}
+                                </Button>
+                              </div>
+                              <div className="bg-muted/30 rounded-lg p-4 border">
+                                <pre className="whitespace-pre-wrap text-sm font-mono text-foreground overflow-x-auto">
+                                  {prefilledPrompt || 'Loading pre-filled prompt...'}
+                                </pre>
+                              </div>
+                            </div>
+                          </TabsContent>
+                          
+                          <TabsContent value="template" className="mt-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm text-muted-foreground">
+                                  Template with placeholders
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outlined"
+                                  onClick={async () => {
+                                    try {
+                                      await navigator.clipboard.writeText(promptData?.prompt_template || '');
+                                      setCopied(true);
+                                      setTimeout(() => setCopied(false), 2000);
+                                    } catch (error) {
+                                      console.error('Failed to copy:', error);
+                                    }
+                                  }}
+                                  className="h-8"
+                                >
+                                  {copied ? '✓ Copied!' : 'Copy'}
+                                </Button>
+                              </div>
+                              <div className="bg-muted/30 rounded-lg p-4 border">
+                                <pre className="whitespace-pre-wrap text-sm font-mono text-foreground">
+                                  {promptData?.prompt_template || 'No prompt found'}
+                                </pre>
+                              </div>
+                              <div className="text-xs text-muted-foreground space-y-1">
+                                <p><strong>Placeholders:</strong></p>
+                                <ul className="list-disc list-inside space-y-1 ml-2">
+                                  <li><code>{'{region}'}</code> - Selected region name</li>
+                                  <li><code>{'{marketMetrics}'}</code> - Market metrics JSON</li>
+                                  <li><code>{'{economicIndicators}'}</code> - Economic indicators JSON</li>
+                                  <li><code>{'{recentNews}'}</code> - Recent news articles JSON</li>
+                                </ul>
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -1504,6 +1685,133 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Analysis History Table */}
+            <div className="mt-6 bg-card text-card-foreground rounded-xl border shadow-subtle-md overflow-hidden">
+              <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
+                <div>
+                  <h4 className="text-lg font-semibold">Analysis History</h4>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Recent LLM analysis outputs for {selectedRegion}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/analysis/reparse', { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({})
+                      });
+                      const data = await res.json();
+                      if (data.updated > 0) {
+                        // Refresh the history
+                        const historyRes = await fetch(`/api/analysis/history?region=${encodeURIComponent(selectedRegion)}&limit=20&t=${Date.now()}`, { 
+                          cache: 'no-store',
+                          headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache'
+                          }
+                        });
+                        const historyData = await historyRes.json();
+                        setAnalysisHistory(historyData.data || []);
+                        alert(`Updated ${data.updated} analysis record(s)`);
+                      } else {
+                        alert('No records needed updating');
+                      }
+                    } catch (error) {
+                      console.error('Failed to re-parse analyses:', error);
+                      alert('Failed to re-parse analyses');
+                    }
+                  }}
+                  className="h-8 text-xs"
+                >
+                  Re-parse All
+                </Button>
+              </div>
+              <div className="overflow-x-auto">
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Spinner className="h-6 w-6" />
+                  </div>
+                ) : analysisHistory.length > 0 ? (
+                  <table className="w-full">
+                    <thead className="bg-muted/50 border-b">
+                      <tr>
+                        <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                        <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sentiment</th>
+                        <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Best Timing</th>
+                        <th className="text-left p-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {analysisHistory.map((item: any) => (
+                        <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="p-3 text-sm">
+                            <div className="font-medium">
+                              {new Date(item.execution_date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(item.execution_date).toLocaleTimeString('en-US', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </div>
+                          </td>
+                          <td className="p-3 text-sm">
+                            {item.market_sentiment_score !== null && item.market_sentiment_score !== undefined ? (
+                              <div className="flex items-center gap-2">
+                                <Badge 
+                                  variant={Number(item.market_sentiment_score) >= 70 ? "default" : Number(item.market_sentiment_score) >= 40 ? "secondary" : "outline"}
+                                  className="text-xs font-bold"
+                                >
+                                  {Number(item.market_sentiment_score)}/100
+                                </Badge>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-sm">
+                            <div className="max-w-xs truncate" title={item.best_timing || 'N/A'}>
+                              {item.best_timing && item.best_timing.trim() ? (
+                                item.best_timing
+                              ) : (
+                                <span className="text-muted-foreground">N/A</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3 text-sm">
+                            <Button
+                              size="sm"
+                              variant="outlined"
+                              onClick={() => {
+                                setAnalysis(item.full_analysis);
+                                // Scroll to top of analysis section
+                                document.getElementById('gemini-analysis')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }}
+                              className="h-7 text-xs"
+                            >
+                              View
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 border-t">
+                    <p className="text-sm text-muted-foreground">No analysis history found for {selectedRegion}</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">Run an analysis to see history here</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* News Feed */}
