@@ -24,21 +24,39 @@ export async function GET(req: Request) {
       }
     }
 
-    // 2. Sync News (NewsAPI) - Use multiple broader queries
+    // 2. Sync News (NewsAPI) - Use more specific, targeted queries
     const queries = [
-      'housing market policy',
-      'real estate policy',
-      'mortgage rates housing',
-      'Las Vegas housing market'
+      '"housing policy" OR "real estate policy"',
+      '"mortgage rates" AND (housing OR "real estate")',
+      '"Las Vegas" AND ("housing market" OR "real estate")',
+      '"federal housing" OR "housing legislation"',
+      '"home prices" AND (policy OR regulation)'
     ];
+
+    // Keywords that indicate relevant articles
+    const relevantKeywords = [
+      'housing', 'real estate', 'mortgage', 'home price', 'property',
+      'housing market', 'housing policy', 'real estate policy',
+      'federal housing', 'housing legislation', 'housing regulation',
+      'Las Vegas', 'Nevada', 'homebuyer', 'homeowner'
+    ];
+
+    // Function to check if article is relevant
+    const isRelevant = (article: any): boolean => {
+      const text = `${article.title} ${article.description || ''}`.toLowerCase();
+      return relevantKeywords.some(keyword => text.includes(keyword.toLowerCase()));
+    };
 
     const allArticles: any[] = [];
 
     for (const query of queries) {
       try {
-        const news = await fetchHousingNews(query);
+        const news = await fetchHousingNews(query, { daysBack: 30 });
         if (news && news.length > 0) {
-          allArticles.push(...news);
+          // Filter for relevance
+          const relevantArticles = news.filter(isRelevant);
+          allArticles.push(...relevantArticles);
+          console.log(`Query "${query}": ${news.length} total, ${relevantArticles.length} relevant`);
         }
       } catch (error) {
         console.error(`Error fetching news for "${query}":`, error);
@@ -60,7 +78,7 @@ export async function GET(req: Request) {
       }, { onConflict: 'url' });
     }
 
-    console.log(`Synced ${uniqueArticles.slice(0, 50).length} news articles`);
+    console.log(`Synced ${uniqueArticles.slice(0, 50).length} relevant news articles`);
 
     // 3. Sync Real Market Metrics for Las Vegas
     const [attomData, redfinData] = await Promise.all([

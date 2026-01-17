@@ -41,13 +41,20 @@ export interface NewsResponse {
   articles: NewsArticle[];
 }
 
-export async function fetchHousingNews(query: string = 'housing market policy') {
+export async function fetchHousingNews(query: string = 'housing market policy', options?: { daysBack?: number }) {
   const apiKey = process.env.NEWS_API_KEY;
   if (!apiKey) {
     throw new Error('NEWS_API_KEY is not defined');
   }
 
-  const url = `${NEWS_BASE_URL}/everything?q=${encodeURIComponent(query)}&apiKey=${apiKey}&sortBy=publishedAt&pageSize=10`;
+  // Calculate date for filtering (default to last 30 days)
+  const daysBack = options?.daysBack || 30;
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - daysBack);
+  const fromDateStr = fromDate.toISOString().split('T')[0];
+
+  // Use publishedAt sorting and search in title/description for better results
+  const url = `${NEWS_BASE_URL}/everything?q=${encodeURIComponent(query)}&apiKey=${apiKey}&sortBy=publishedAt&searchIn=title,description&from=${fromDateStr}&language=en&pageSize=20`;
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -55,7 +62,7 @@ export async function fetchHousingNews(query: string = 'housing market policy') 
   }
 
   const data: NewsResponse = await response.json();
-  return data.articles;
+  return data.articles || [];
 }
 
 /**

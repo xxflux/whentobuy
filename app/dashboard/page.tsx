@@ -620,7 +620,7 @@ export default function DashboardPage() {
                   onClick={async () => {
                     setRefreshingNews(true);
                     try {
-                      const res = await fetch(`/api/news?refresh=true&t=${Date.now()}`, { cache: 'no-store' });
+                      const res = await fetch(`/api/news?t=${Date.now()}`, { cache: 'no-store' });
                       const data = await res.json();
                       setNews(data.articles || []);
                     } catch (error) {
@@ -641,7 +641,7 @@ export default function DashboardPage() {
                     'Refresh'
                   )}
                 </Button>
-                <Badge variant="secondary" className="text-xs">Cached</Badge>
+                <Badge variant="secondary" className="text-xs">Live</Badge>
               </div>
             </div>
             <div className="space-y-5">
