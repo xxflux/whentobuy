@@ -12,15 +12,21 @@ export async function GET(req: Request) {
     // 1. Sync Economic Indicators (FRED)
     const series = ['MORTGAGE30US', 'FEDFUNDS', 'UNRATE'];
     for (const s of series) {
-      const data = await fetchFredData(s);
+      const data = await fetchFredData(s, 100); // Fetch up to 100 historical points (since Jan 2025)
       if (data && data.length > 0) {
-        // Insert only the latest observation
-        const latest = data[0];
-        await supabase.from('economic_indicators').upsert({
+        // Upsert all observations to populate historical charts
+        const upsertData = data.map((obs: any) => ({
           series_id: s,
-          value: parseFloat(latest.value),
-          indicator_date: latest.date
-        }, { onConflict: 'series_id,indicator_date' });
+          value: parseFloat(obs.value),
+          indicator_date: obs.date
+        })).filter((obs: any) => !isNaN(obs.value));
+
+        if (upsertData.length > 0) {
+          const { error } = await supabase.from('economic_indicators').upsert(upsertData, { 
+            onConflict: 'series_id,indicator_date' 
+          });
+          if (error) console.error(`Error upserting ${s}:`, error);
+        }
       }
     }
 

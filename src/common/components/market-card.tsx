@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '@/common/ui/badge-component';
-import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
+import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip } from 'recharts';
 
 interface MarketCardProps {
   title: string;
@@ -10,7 +10,8 @@ interface MarketCardProps {
   label?: string;
   source?: string;
   sourceLink?: string;
-  chartData?: { value: number }[];
+  chartData?: { value: number; date?: string }[];
+  showXAxis?: boolean;
 }
 
 export const MarketCard: React.FC<MarketCardProps> = ({ 
@@ -21,7 +22,8 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   label,
   source,
   sourceLink,
-  chartData
+  chartData,
+  showXAxis = false
 }) => {
   return (
     <div className="bg-card text-card-foreground rounded-lg border p-6 shadow-subtle-sm transition-all hover:shadow-subtle-md relative overflow-hidden flex flex-col justify-between min-h-[220px]">
@@ -40,11 +42,31 @@ export const MarketCard: React.FC<MarketCardProps> = ({
         </div>
       </div>
 
-      <div className="mt-4 h-[60px] w-full">
+      <div className={`mt-4 ${showXAxis ? 'h-[100px]' : 'h-[60px]'} w-full`}>
         {chartData && chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
+            <LineChart data={chartData} margin={showXAxis ? { bottom: 20, left: 5, right: 5 } : {}}>
               <YAxis domain={['auto', 'auto']} hide />
+              {showXAxis && (
+                <XAxis 
+                  dataKey="date" 
+                  hide={false} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 9, fill: '#94a3b8' }}
+                  tickFormatter={(str) => {
+                    const date = new Date(str);
+                    return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                  }}
+                  interval="preserveStartEnd"
+                  minTickGap={20}
+                />
+              )}
+              <Tooltip 
+                contentStyle={{ fontSize: '10px', borderRadius: '4px', border: '1px solid #e2e8f0' }}
+                labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                formatter={(val: number) => [val, title]}
+              />
               <Line 
                 type="monotone" 
                 dataKey="value" 

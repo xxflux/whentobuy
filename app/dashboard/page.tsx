@@ -449,6 +449,7 @@ export default function DashboardPage() {
             source="Database (Attom/Redfin)"
             sourceLink="https://www.redfin.com/news/data-center/"
             chartData={history?.prices}
+            showXAxis={true}
           />
           <MarketCard 
             title="30-Yr Mortgage Rate" 
@@ -459,6 +460,7 @@ export default function DashboardPage() {
             source="Database (FRED)"
             sourceLink="https://fred.stlouisfed.org/series/MORTGAGE30US"
             chartData={history?.mortgage}
+            showXAxis={true}
           />
           <MarketCard 
             title="Inventory (Active)" 
@@ -469,6 +471,7 @@ export default function DashboardPage() {
             source="Database (Redfin)"
             sourceLink="https://www.redfin.com/news/data-center/"
             chartData={history?.inventory}
+            showXAxis={true}
           />
           <MarketCard 
             title="Average Days on Market" 
@@ -479,6 +482,7 @@ export default function DashboardPage() {
             source="Database (Redfin/Attom)"
             sourceLink="https://www.redfin.com/news/data-center/"
             chartData={history?.dom}
+            showXAxis={true}
           />
         </div>
 
@@ -1077,6 +1081,9 @@ export default function DashboardPage() {
             <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
               <p><strong>What it is:</strong> The volume of new houses hitting the market vs the number of completed sales.</p>
               <p><strong>Why it's useful:</strong> Measures <strong>liquidity</strong>. You want to invest where houses are moving. If sales count drops while listings rise, it signals an oversupply which could pressure prices down.</p>
+              <p className="text-muted-foreground italic text-xs border-t pt-2 mt-2">
+                <strong>Note:</strong> While <strong>New Listings</strong> are specific to each district, Zillow only provides <strong>Sales Count</strong> at the Metro level. Therefore, the sales volume shown represents the entire Las Vegas Metro area across all views.
+              </p>
             </div>
 
             <div className="h-[300px] w-full">

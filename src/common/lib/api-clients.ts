@@ -10,13 +10,16 @@ export interface FredResponse {
   observations: FredObservation[];
 }
 
-export async function fetchFredData(seriesId: string) {
+export async function fetchFredData(seriesId: string, limit: number = 100) {
   const apiKey = process.env.FRED_API_KEY;
   if (!apiKey) {
     throw new Error('FRED_API_KEY is not defined');
   }
 
-  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=12`;
+  // Calculate start date for filtering (Jan 1, 2025)
+  const observationStart = '2025-01-01';
+
+  const url = `${FRED_BASE_URL}/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=${limit}&observation_start=${observationStart}`;
   
   const response = await fetch(url);
   if (!response.ok) {

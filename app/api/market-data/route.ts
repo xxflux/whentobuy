@@ -30,25 +30,29 @@ export async function GET(req: Request) {
         .select('value, metric_date')
         .eq('location', 'Las Vegas')
         .eq('metric_name', 'median_sale_price')
+        .gte('metric_date', '2025-01-01')
         .order('metric_date', { ascending: true })
-        .limit(30),
+        .limit(1000),
       supabase.from('market_metrics')
         .select('value, metric_date')
         .eq('location', 'Las Vegas')
         .eq('metric_name', 'inventory')
+        .gte('metric_date', '2025-01-01')
         .order('metric_date', { ascending: true })
-        .limit(30),
+        .limit(1000),
       supabase.from('market_metrics')
         .select('value, metric_date')
         .eq('location', 'Las Vegas')
         .eq('metric_name', 'days_on_market')
+        .gte('metric_date', '2025-01-01')
         .order('metric_date', { ascending: true })
-        .limit(30),
+        .limit(1000),
       supabase.from('economic_indicators')
         .select('value, indicator_date')
         .eq('series_id', 'MORTGAGE30US')
+        .gte('indicator_date', '2025-01-01')
         .order('indicator_date', { ascending: true })
-        .limit(30),
+        .limit(1000),
       supabase.from('zillow_home_value_index')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
