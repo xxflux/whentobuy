@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/common/lib/supabase-client';
 import { fetchFredData, fetchAttomMarketData, fetchRedfinMarketStats } from '@/common/lib/api-clients';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const region = searchParams.get('region') || 'Las Vegas';
@@ -49,43 +52,48 @@ export async function GET(req: Request) {
       supabase.from('zillow_home_value_index')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-02-01')
+        .eq('state_name', 'NV')
+        .gte('indicator_date', '2025-01-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_rent_index')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-02-01')
+        .eq('state_name', 'NV')
+        .gte('indicator_date', '2025-01-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_price_cuts')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-02-01')
+        .eq('state_name', 'NV')
+        .gte('indicator_date', '2025-01-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_new_listings')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-02-01')
+        .eq('state_name', 'NV')
+        .gte('indicator_date', '2025-01-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_sales_count')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-02-01')
+        .eq('state_name', 'NV')
+        .gte('indicator_date', '2025-01-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_forecasts')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-02-01')
-        .lte('indicator_date', new Date().toISOString().split('T')[0])
+        .eq('state_name', 'NV')
+        .gte('indicator_date', '2025-01-01')
         .order('indicator_date', { ascending: true })
         .limit(1000)
     ]);

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/common/lib/supabase-client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const REGIONS = ['Las Vegas', 'Summerlin', 'Henderson', 'Southwest', 'Enterprise'];
 
 export async function GET() {
@@ -11,8 +14,8 @@ export async function GET() {
         .from('zillow_forecasts')
         .select('value, indicator_date, region_name')
         .ilike('region_name', region)
-        .gte('indicator_date', '2025-02-01')
-        .lte('indicator_date', new Date().toISOString().split('T')[0])
+        .eq('state_name', 'NV')
+        .gte('indicator_date', '2025-01-01')
         .order('indicator_date', { ascending: true })
         .limit(1000);
 
