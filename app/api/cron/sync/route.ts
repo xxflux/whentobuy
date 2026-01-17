@@ -92,14 +92,18 @@ export async function GET(req: Request) {
       fetchRedfinMarketStats('Las Vegas')
     ]);
 
-    const medianPrice = attomData?.medianValue || redfinData?.median_sale_price || 462000;
+    const medianPrice = attomData?.medianValue || redfinData?.median_sale_price;
     
-    await supabase.from('market_metrics').upsert({
-      location: 'Las Vegas',
-      metric_name: 'median_sale_price',
-      value: medianPrice,
-      metric_date: new Date().toISOString().split('T')[0]
-    }, { onConflict: 'location,metric_name,metric_date' });
+    if (!medianPrice) {
+      console.error('[Cron Sync] Error: Failed to fetch median sale price from AttomData and Redfin APIs. Skipping upsert.');
+    } else {
+      await supabase.from('market_metrics').upsert({
+        location: 'Las Vegas',
+        metric_name: 'median_sale_price',
+        value: medianPrice,
+        metric_date: new Date().toISOString().split('T')[0]
+      }, { onConflict: 'location,metric_name,metric_date' });
+    }
 
     return NextResponse.json({ 
       success: true, 

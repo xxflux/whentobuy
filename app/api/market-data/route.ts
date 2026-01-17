@@ -110,26 +110,44 @@ export async function GET(req: Request) {
         fetchFredData('MORTGAGE30US')
       ]);
 
-      const medianPrice = attomData?.medianValue || redfinData?.median_sale_price || 462000;
-      const activeInventory = redfinData?.active_listings || attomData?.inventoryCount || 3450;
-      const avgDOM = redfinData?.median_days_on_market || attomData?.avgDaysOnMarket || 42;
-      const latestMortgage = fredData?.[0]?.value || 6.8;
+      const medianPrice = attomData?.medianValue || redfinData?.median_sale_price;
+      const activeInventory = redfinData?.active_listings || attomData?.inventoryCount;
+      const avgDOM = redfinData?.median_days_on_market || attomData?.avgDaysOnMarket;
+      const latestMortgage = fredData?.[0]?.value;
       const today = new Date().toISOString().split('T')[0];
 
-      // Upsert to Supabase so it's not empty next time
+      // Log errors if required data is missing
+      if (!medianPrice) {
+        console.error('[Market Data] Error: Failed to fetch median sale price from AttomData and Redfin APIs');
+      }
+      if (!activeInventory) {
+        console.error('[Market Data] Error: Failed to fetch inventory count from Redfin and AttomData APIs');
+      }
+      if (!avgDOM) {
+        console.error('[Market Data] Error: Failed to fetch days on market from Redfin and AttomData APIs');
+      }
+      if (!latestMortgage) {
+        console.error('[Market Data] Error: Failed to fetch mortgage rate from FRED API');
+      }
+
+      // Upsert to Supabase so it's not empty next time (only if we have valid data)
       const metrics = [
         { name: 'median_sale_price', value: medianPrice },
         { name: 'inventory', value: activeInventory },
         { name: 'days_on_market', value: avgDOM }
-      ];
+      ].filter(m => m.value != null && m.value !== undefined);
 
-      for (const m of metrics) {
-        await supabase.from('market_metrics').upsert({
-          location: 'Las Vegas',
-          metric_name: m.name,
-          value: m.value,
-          metric_date: today
-        }, { onConflict: 'location,metric_name,metric_date' });
+      if (metrics.length === 0) {
+        console.error('[Market Data] Error: No valid market metrics to upsert. All API calls failed or returned no data.');
+      } else {
+        for (const m of metrics) {
+          await supabase.from('market_metrics').upsert({
+            location: 'Las Vegas',
+            metric_name: m.name,
+            value: m.value,
+            metric_date: today
+          }, { onConflict: 'location,metric_name,metric_date' });
+        }
       }
 
       if (fredData?.[0]) {
@@ -143,10 +161,10 @@ export async function GET(req: Request) {
       // Return the freshly fetched data for the current request
       return NextResponse.json({
         latest: {
-          price: Number(medianPrice),
-          inventory: Number(activeInventory),
-          dom: Number(avgDOM),
-          mortgage: Number(latestMortgage),
+          price: medianPrice ? Number(medianPrice) : 0,
+          inventory: activeInventory ? Number(activeInventory) : 0,
+          dom: avgDOM ? Number(avgDOM) : 0,
+          mortgage: latestMortgage ? Number(latestMortgage) : 0,
           zhvi: Number(zhvi.data?.[zhvi.data.length - 1]?.value || 0),
           zori: Number(zori.data?.[zori.data.length - 1]?.value || 0),
           priceCuts: Number(priceCuts.data?.[priceCuts.data.length - 1]?.value || 0),
@@ -156,9 +174,9 @@ export async function GET(req: Request) {
           date: today
         },
         history: {
-          prices: [{ value: Number(medianPrice), date: today }],
-          inventory: [{ value: Number(activeInventory), date: today }],
-          dom: [{ value: Number(avgDOM), date: today }],
+          prices: medianPrice ? [{ value: Number(medianPrice), date: today }] : [],
+          inventory: activeInventory ? [{ value: Number(activeInventory), date: today }] : [],
+          dom: avgDOM ? [{ value: Number(avgDOM), date: today }] : [],
           mortgage: mortgage.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
           zhvi: zhvi.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
           zori: zori.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
