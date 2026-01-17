@@ -19,6 +19,48 @@ import {
   Legend
 } from 'recharts';
 
+// Custom tooltip that sorts districts by value (highest first)
+const ZhviTooltip = (props: any) => {
+  const { active, payload, label } = props;
+  
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  // Sort payload by value (descending - highest first)
+  const sortedPayload = [...payload].sort((a: any, b: any) => {
+    const aValue = a.value as number || 0;
+    const bValue = b.value as number || 0;
+    return bValue - aValue;
+  });
+
+  return (
+    <div style={{
+      backgroundColor: '#fff',
+      borderRadius: '8px',
+      border: '1px solid #e5e7eb',
+      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+      padding: '12px'
+    }}>
+      <p style={{ marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
+        {new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+      </p>
+      {sortedPayload.map((entry: any, index: number) => (
+        <p key={index} style={{ 
+          margin: '4px 0', 
+          fontSize: '13px',
+          color: entry.color 
+        }}>
+          <span style={{ fontWeight: 500 }}>{entry.name}:</span>{' '}
+          <span style={{ fontWeight: 600 }}>
+            ${Number(entry.value).toLocaleString()}
+          </span>
+        </p>
+      ))}
+    </div>
+  );
+};
+
 export default function DashboardPage() {
   const [marketData, setMarketData] = useState<any>(null);
   const [news, setNews] = useState<any[]>([]);
@@ -30,6 +72,8 @@ export default function DashboardPage() {
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptData, setPromptData] = useState<any>(null);
   const [loadingPrompt, setLoadingPrompt] = useState(false);
+  const [allRegionsZhvi, setAllRegionsZhvi] = useState<any[]>([]);
+  const [loadingZhvi, setLoadingZhvi] = useState(true);
 
   const regions = [
     'Las Vegas',
@@ -59,6 +103,24 @@ export default function DashboardPage() {
 
     fetchData();
   }, [selectedRegion]);
+
+  // Fetch all regions ZHVI data
+  useEffect(() => {
+    async function fetchAllZhvi() {
+      setLoadingZhvi(true);
+      try {
+        const res = await fetch('/api/market-data/zhvi-all', { cache: 'no-store' });
+        const data = await res.json();
+        setAllRegionsZhvi(data.data || []);
+      } catch (error) {
+        console.error('Failed to fetch all regions ZHVI:', error);
+      } finally {
+        setLoadingZhvi(false);
+      }
+    }
+
+    fetchAllZhvi();
+  }, []);
 
   const runAnalysis = async () => {
     setAnalyzing(true);
@@ -168,25 +230,10 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Region Selector and AI Analysis Button - Above Zillow Charts */}
+        {/* Region Selector - Above Zillow Charts */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Zillow District Trends</h2>
-            <Button 
-              onClick={runAnalysis} 
-              disabled={analyzing}
-              size="lg"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg text-base h-12"
-            >
-              {analyzing ? (
-                <>
-                  <Spinner className="h-4 w-4 mr-2" />
-                  Gemini Analyzing...
-                </>
-              ) : (
-                'Get AI Timing Opinion'
-              )}
-            </Button>
           </div>
           <div className="bg-muted/30 p-1 rounded-xl inline-flex overflow-x-auto no-scrollbar max-w-full">
             <Tabs value={selectedRegion} onValueChange={setSelectedRegion} className="w-full">
@@ -205,9 +252,9 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Zillow Home Value Index Chart Section - Region Specific */}
+        {/* Zillow Home Value Index Chart Section - All Districts */}
         <div className="bg-card text-card-foreground rounded-xl border p-8 shadow-subtle-md relative">
-          {loading && (
+          {loadingZhvi && (
             <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
               <Spinner className="h-8 w-8" />
             </div>
@@ -215,18 +262,15 @@ export default function DashboardPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
               <h3 className="text-2xl font-bold">Zillow Home Value Index (ZHVI)</h3>
-              <p className="text-muted-foreground mt-1">Single-Family Homes Time Series - {selectedRegion}, NV</p>
+              <p className="text-muted-foreground mt-1">Single-Family Homes Time Series - All Districts, NV</p>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">${displayZHVI?.toLocaleString()}</span>
-              <Badge variant="secondary" className="text-xs">Official Index</Badge>
-            </div>
+            <Badge variant="secondary" className="text-xs">Official Index</Badge>
           </div>
           
-          <div className="h-[350px] w-full mt-4">
-            {history?.zhvi && history.zhvi.length > 0 ? (
+          <div className="h-[400px] w-full mt-4">
+            {allRegionsZhvi.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={history.zhvi} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
+                <LineChart data={allRegionsZhvi} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                   <XAxis 
                     dataKey="date" 
@@ -246,31 +290,69 @@ export default function DashboardPage() {
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#fff', 
-                      borderRadius: '8px', 
-                      border: '1px solid #e5e7eb',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                    }}
-                    formatter={(value: any) => [`$${value.toLocaleString()}`, 'Value Index']}
-                    labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  <Tooltip content={<ZhviTooltip />} />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    iconType="line"
+                    formatter={(value) => <span style={{ fontSize: '12px', color: '#6b7280' }}>{value}</span>}
                   />
+                  {/* Las Vegas - Blue */}
                   <Line 
                     type="monotone" 
-                    dataKey="value" 
+                    dataKey="Las Vegas" 
                     stroke="#3b82f6" 
-                    strokeWidth={3} 
-                    dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Las Vegas"
+                  />
+                  {/* Summerlin - Purple */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Summerlin" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Summerlin"
+                  />
+                  {/* Henderson - Green */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Henderson" 
+                    stroke="#10b981" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Henderson"
+                  />
+                  {/* Southwest - Orange */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Southwest" 
+                    stroke="#f59e0b" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Southwest"
+                  />
+                  {/* Enterprise - Red */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Enterprise" 
+                    stroke="#ef4444" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Enterprise"
                   />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/10">
                 <Spinner className="h-8 w-8 mb-4 text-primary/40" />
-                <p className="text-muted-foreground font-medium">No region-specific Zillow data found.</p>
-                <p className="text-xs text-muted-foreground/60 mt-1 italic">Please ensure data is seeded for {selectedRegion}.</p>
+                <p className="text-muted-foreground font-medium">No Zillow data found for districts.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1 italic">Please ensure data is seeded for all districts.</p>
               </div>
             )}
           </div>
@@ -576,34 +658,51 @@ export default function DashboardPage() {
                   <h3 className="text-xl font-semibold text-white flex items-center gap-2">
                     <span className="text-2xl">✨</span> Gemini Flash Analysis
                   </h3>
-                  <Button
-                    variant="outlined"
-                    size="sm"
-                    onClick={async () => {
-                      setLoadingPrompt(true);
-                      try {
-                        const res = await fetch('/api/prompts');
-                        const data = await res.json();
-                        setPromptData(data);
-                        setPromptOpen(true);
-                      } catch (error) {
-                        console.error('Failed to fetch prompt:', error);
-                      } finally {
-                        setLoadingPrompt(false);
-                      }
-                    }}
-                    disabled={loadingPrompt}
-                    className="text-xs h-8 bg-white/10 hover:bg-white/20 text-white border-white/20"
-                  >
-                    {loadingPrompt ? (
-                      <>
-                        <Spinner className="h-3 w-3 mr-1" />
-                        Loading...
-                      </>
-                    ) : (
-                      'Check Prompt'
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={runAnalysis} 
+                      disabled={analyzing}
+                      size="lg"
+                      className="bg-white hover:bg-white/90 text-blue-600 shadow-lg text-base h-10 px-4"
+                    >
+                      {analyzing ? (
+                        <>
+                          <Spinner className="h-4 w-4 mr-2" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        'Get AI Timing Opinion'
+                      )}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="sm"
+                      onClick={async () => {
+                        setLoadingPrompt(true);
+                        try {
+                          const res = await fetch('/api/prompts');
+                          const data = await res.json();
+                          setPromptData(data);
+                          setPromptOpen(true);
+                        } catch (error) {
+                          console.error('Failed to fetch prompt:', error);
+                        } finally {
+                          setLoadingPrompt(false);
+                        }
+                      }}
+                      disabled={loadingPrompt}
+                      className="text-xs h-10 bg-white/10 hover:bg-white/20 text-white border-white/20"
+                    >
+                      {loadingPrompt ? (
+                        <>
+                          <Spinner className="h-3 w-3 mr-1" />
+                          Loading...
+                        </>
+                      ) : (
+                        'Check Prompt'
+                      )}
+                    </Button>
+                  </div>
                   <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
                     <DialogContent
                       ariaTitle="LLM Prompt Template"
