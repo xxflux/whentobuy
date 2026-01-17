@@ -24,19 +24,43 @@ export async function GET(req: Request) {
       }
     }
 
-    // 2. Sync News (NewsAPI)
-    const news = await fetchHousingNews('Trump housing policy Las Vegas');
-    if (news && news.length > 0) {
-      for (const article of news) {
-        await supabase.from('housing_news').upsert({
-          title: article.title,
-          description: article.description,
-          url: article.url,
-          published_at: article.publishedAt,
-          source: article.source.name
-        }, { onConflict: 'url' });
+    // 2. Sync News (NewsAPI) - Use multiple broader queries
+    const queries = [
+      'housing market policy',
+      'real estate policy',
+      'mortgage rates housing',
+      'Las Vegas housing market'
+    ];
+
+    const allArticles: any[] = [];
+
+    for (const query of queries) {
+      try {
+        const news = await fetchHousingNews(query);
+        if (news && news.length > 0) {
+          allArticles.push(...news);
+        }
+      } catch (error) {
+        console.error(`Error fetching news for "${query}":`, error);
       }
     }
+
+    // Remove duplicates and store
+    const uniqueArticles = Array.from(
+      new Map(allArticles.map(article => [article.url, article])).values()
+    ).sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+    for (const article of uniqueArticles.slice(0, 50)) {
+      await supabase.from('housing_news').upsert({
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        published_at: article.publishedAt,
+        source: article.source.name
+      }, { onConflict: 'url' });
+    }
+
+    console.log(`Synced ${uniqueArticles.slice(0, 50).length} news articles`);
 
     // 3. Sync Real Market Metrics for Las Vegas
     const [attomData, redfinData] = await Promise.all([
