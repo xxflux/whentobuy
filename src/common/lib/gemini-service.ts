@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { supabase } from './supabase-client';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -11,34 +12,78 @@ const MODEL_NAME = 'gemini-2.0-flash-exp';
 
 const genAI = new GoogleGenerativeAI(apiKey || '');
 
+// Default prompt template (fallback if DB doesn't have it)
+const DEFAULT_PROMPT_TEMPLATE = `You are an expert real estate investment advisor. 
+Analyze the following data for the Las Vegas housing market, focusing specifically on the district of {region} where applicable.
+
+Note: "price", "inventory", and "dom" (days on market) represent overall Las Vegas metrics. 
+"zhvi", "zori", "priceCuts", "newListings", "salesCount", and "forecast" specifically represent the district of {region}.
+
+Consolidated Metrics:
+{marketMetrics}
+
+Economic Indicators (National/Local):
+{economicIndicators}
+
+Recent News & Policy Changes:
+{recentNews}
+
+Please provide your analysis in the following format:
+1. **Market Sentiment Score**: (0-100, where 100 is extremely bullish/buy now)
+2. **Best Timing**: (e.g., Buy now, Wait 6 months, etc.)
+3. **Regional Focus ({region})**: (Specific insights about {region} vs the overall Las Vegas market)
+4. **Strategic Reasoning**: (Brief explanation of why, considering the 5-6 year hold period and the current political climate/policy changes)`;
+
+async function getPromptTemplate(): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('llm_prompts')
+      .select('prompt_template')
+      .eq('prompt_key', 'gemini_housing_analysis')
+      .single();
+
+    if (error || !data) {
+      console.warn('Prompt not found in database, using default template');
+      return DEFAULT_PROMPT_TEMPLATE;
+    }
+
+    return data.prompt_template || DEFAULT_PROMPT_TEMPLATE;
+  } catch (error) {
+    console.error('Error fetching prompt template:', error);
+    return DEFAULT_PROMPT_TEMPLATE;
+  }
+}
+
+function replacePlaceholders(template: string, data: {
+  region: string;
+  marketMetrics: any;
+  economicIndicators: any;
+  recentNews: any;
+}): string {
+  return template
+    .replace(/{region}/g, data.region)
+    .replace(/{marketMetrics}/g, JSON.stringify(data.marketMetrics, null, 2))
+    .replace(/{economicIndicators}/g, JSON.stringify(data.economicIndicators, null, 2))
+    .replace(/{recentNews}/g, JSON.stringify(data.recentNews, null, 2));
+}
+
 export async function analyzeHousingMarket(data: {
   marketMetrics: any;
   economicIndicators: any;
   recentNews: any;
 }) {
   const region = data.marketMetrics.region || 'Las Vegas';
-  const prompt = `
-    You are an expert real estate investment advisor. 
-    Analyze the following data for the Las Vegas housing market, focusing specifically on the district of ${region} where applicable.
-    
-    Note: "price", "inventory", and "dom" (days on market) represent overall Las Vegas metrics. 
-    "zhvi", "zori", "priceCuts", "newListings", "salesCount", and "forecast" specifically represent the district of ${region}.
-
-    Consolidated Metrics:
-    ${JSON.stringify(data.marketMetrics, null, 2)}
-
-    Economic Indicators (National/Local):
-    ${JSON.stringify(data.economicIndicators, null, 2)}
-
-    Recent News & Policy Changes:
-    ${JSON.stringify(data.recentNews, null, 2)}
-
-    Please provide your analysis in the following format:
-    1. **Market Sentiment Score**: (0-100, where 100 is extremely bullish/buy now)
-    2. **Best Timing**: (e.g., Buy now, Wait 6 months, etc.)
-    3. **Regional Focus (${region})**: (Specific insights about ${region} vs the overall Las Vegas market)
-    4. **Strategic Reasoning**: (Brief explanation of why, considering the 5-6 year hold period and the current political climate/policy changes)
-  `;
+  
+  // Fetch prompt template from database
+  const promptTemplate = await getPromptTemplate();
+  
+  // Replace placeholders with actual data
+  const prompt = replacePlaceholders(promptTemplate, {
+    region,
+    marketMetrics: data.marketMetrics,
+    economicIndicators: data.economicIndicators,
+    recentNews: data.recentNews
+  });
 
   try {
     if (!apiKey) {

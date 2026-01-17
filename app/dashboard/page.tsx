@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Badge, Button, Spinner, Tabs, TabsList, TabsTrigger } from '@/common/ui';
+import { Badge, Button, Spinner, Tabs, TabsList, TabsTrigger, Dialog, DialogContent, DialogTrigger } from '@/common/ui';
 import { MarketCard } from '@/common/components/market-card';
 import { 
   LineChart, 
@@ -27,6 +27,9 @@ export default function DashboardPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [refreshingNews, setRefreshingNews] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState('Las Vegas');
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptData, setPromptData] = useState<any>(null);
+  const [loadingPrompt, setLoadingPrompt] = useState(false);
 
   const regions = [
     'Las Vegas',
@@ -569,9 +572,76 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-card text-card-foreground rounded-xl border shadow-subtle-md overflow-hidden">
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5">
-                <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                  <span className="text-2xl">✨</span> Gemini Flash Analysis
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                    <span className="text-2xl">✨</span> Gemini Flash Analysis
+                  </h3>
+                  <Button
+                    variant="outlined"
+                    size="sm"
+                    onClick={async () => {
+                      setLoadingPrompt(true);
+                      try {
+                        const res = await fetch('/api/prompts');
+                        const data = await res.json();
+                        setPromptData(data);
+                        setPromptOpen(true);
+                      } catch (error) {
+                        console.error('Failed to fetch prompt:', error);
+                      } finally {
+                        setLoadingPrompt(false);
+                      }
+                    }}
+                    disabled={loadingPrompt}
+                    className="text-xs h-8 bg-white/10 hover:bg-white/20 text-white border-white/20"
+                  >
+                    {loadingPrompt ? (
+                      <>
+                        <Spinner className="h-3 w-3 mr-1" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Check Prompt'
+                    )}
+                  </Button>
+                  <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
+                    <DialogContent
+                      ariaTitle="LLM Prompt Template"
+                      className="max-w-4xl max-h-[80vh] overflow-y-auto"
+                    >
+                      <div className="space-y-4">
+                        <div>
+                          <h2 className="text-2xl font-bold mb-2">Gemini Housing Analysis Prompt</h2>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Badge variant="secondary">Key: {promptData?.prompt_key || 'gemini_housing_analysis'}</Badge>
+                            {promptData?.version && (
+                              <Badge variant="outline">Version: {promptData.version}</Badge>
+                            )}
+                            {promptData?.updated_at && (
+                              <span className="text-xs">
+                                Updated: {new Date(promptData.updated_at).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 border">
+                          <pre className="whitespace-pre-wrap text-sm font-mono text-foreground">
+                            {promptData?.prompt_template || 'No prompt found'}
+                          </pre>
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p><strong>Placeholders:</strong></p>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li><code>{'{region}'}</code> - Selected region name</li>
+                            <li><code>{'{marketMetrics}'}</code> - Market metrics JSON</li>
+                            <li><code>{'{economicIndicators}'}</code> - Economic indicators JSON</li>
+                            <li><code>{'{recentNews}'}</code> - Recent news articles JSON</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
               <div className="p-6">
                 {analysis ? (
@@ -600,13 +670,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Price Chart Placeholder */}
-            <div className="bg-card text-card-foreground rounded-xl border p-6 shadow-subtle-sm relative">
-              <h3 className="text-xl font-semibold mb-4">Market Trend Overview</h3>
-              <div className="h-64 w-full bg-muted/30 rounded flex items-center justify-center border border-dashed">
-                <p className="text-muted-foreground text-base italic">Detailed historical visualization for {selectedRegion} powered by daily syncs.</p>
-              </div>
-            </div>
           </div>
 
           {/* News Feed */}
