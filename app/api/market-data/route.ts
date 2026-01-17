@@ -49,42 +49,42 @@ export async function GET(req: Request) {
       supabase.from('zillow_home_value_index')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-01-01')
+        .gte('indicator_date', '2025-02-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_rent_index')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-01-01')
+        .gte('indicator_date', '2025-02-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_price_cuts')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-01-01')
+        .gte('indicator_date', '2025-02-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_new_listings')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-01-01')
+        .gte('indicator_date', '2025-02-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_sales_count')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-01-01')
+        .gte('indicator_date', '2025-02-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000),
       supabase.from('zillow_forecasts')
         .select('value, indicator_date')
         .ilike('region_name', normalizedRegion)
-        .gte('indicator_date', '2025-01-01')
+        .gte('indicator_date', '2025-02-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000)
@@ -183,6 +183,26 @@ export async function GET(req: Request) {
     const latestSalesCount = salesCount.data && salesCount.data.length > 0 ? salesCount.data[salesCount.data.length - 1] : null;
     const latestForecast = forecasts.data && forecasts.data.length > 0 ? forecasts.data[forecasts.data.length - 1] : null;
 
+    // Helper function to normalize date to YYYY-MM-DD format
+    const normalizeDate = (dateStr: string | null | undefined): string => {
+      if (!dateStr) return dateStr || '';
+      // Extract YYYY-MM-DD from date string (handles both "2025-01-01" and "2025-01-01T00:00:00" formats)
+      const dateOnly = dateStr.split('T')[0];
+      return dateOnly;
+    };
+
+    // Helper function to deduplicate array by date (keep last value for each date)
+    const deduplicateByDate = <T extends { date: string }>(arr: T[]): T[] => {
+      const dateMap = new Map<string, T>();
+      arr.forEach(item => {
+        const normalizedDate = normalizeDate(item.date);
+        dateMap.set(normalizedDate, { ...item, date: normalizedDate });
+      });
+      return Array.from(dateMap.values()).sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+    };
+
     return NextResponse.json({
       latest: {
         price: Number(latestPrice?.value),
@@ -195,19 +215,19 @@ export async function GET(req: Request) {
         newListings: Number(latestNewListings?.value || 0),
         salesCount: Number(latestSalesCount?.value || 0),
         forecast: Number(latestForecast?.value || 0),
-        date: latestPrice?.metric_date
+        date: normalizeDate(latestPrice?.metric_date)
       },
       history: {
-        prices: prices.data?.map(d => ({ value: Number(d.value), date: d.metric_date })) || [],
-        inventory: inventory.data?.map(d => ({ value: Number(d.value), date: d.metric_date })) || [],
-        dom: dom.data?.map(d => ({ value: Number(d.value), date: d.metric_date })) || [],
-        mortgage: mortgage.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-        zhvi: zhvi.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-        zori: zori.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-        priceCuts: priceCuts.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-        newListings: newListings.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-        salesCount: salesCount.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-        forecasts: forecasts.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || []
+        prices: deduplicateByDate(prices.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.metric_date) })) || []),
+        inventory: deduplicateByDate(inventory.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.metric_date) })) || []),
+        dom: deduplicateByDate(dom.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.metric_date) })) || []),
+        mortgage: deduplicateByDate(mortgage.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
+        zhvi: deduplicateByDate(zhvi.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
+        zori: deduplicateByDate(zori.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
+        priceCuts: deduplicateByDate(priceCuts.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
+        newListings: deduplicateByDate(newListings.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
+        salesCount: deduplicateByDate(salesCount.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
+        forecasts: deduplicateByDate(forecasts.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || [])
       }
     });
   } catch (error: any) {

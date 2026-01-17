@@ -17,7 +17,8 @@ import {
   BarChart,
   Bar,
   Legend,
-  ComposedChart
+  ComposedChart,
+  LabelList
 } from 'recharts';
 
 // Custom tooltip that sorts districts by value (highest first)
@@ -188,6 +189,30 @@ const ForecastsTooltip = (props: any) => {
   );
 };
 
+// Helper function to deduplicate data by date
+const deduplicateByDate = (data: any[]): any[] => {
+  if (!data || data.length === 0) return [];
+  
+  const dateMap = new Map<string, any>();
+  
+  data.forEach((item) => {
+    if (!item || !item.date) return;
+    
+    // Normalize date to YYYY-MM-DD format
+    const normalizedDate = typeof item.date === 'string' 
+      ? item.date.split('T')[0] 
+      : new Date(item.date).toISOString().split('T')[0];
+    
+    // Keep the last entry for each date (in case of duplicates)
+    dateMap.set(normalizedDate, { ...item, date: normalizedDate });
+  });
+  
+  // Convert back to array and sort by date
+  return Array.from(dateMap.values()).sort((a, b) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+};
+
 export default function DashboardPage() {
   const [marketData, setMarketData] = useState<any>(null);
   const [news, setNews] = useState<any[]>([]);
@@ -246,7 +271,7 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/market-data/zhvi-all', { cache: 'no-store' });
         const data = await res.json();
-        setAllRegionsZhvi(data.data || []);
+        setAllRegionsZhvi(deduplicateByDate(data.data || []));
       } catch (error) {
         console.error('Failed to fetch all regions ZHVI:', error);
       } finally {
@@ -264,7 +289,7 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/market-data/zori-all', { cache: 'no-store' });
         const data = await res.json();
-        setAllRegionsZori(data.data || []);
+        setAllRegionsZori(deduplicateByDate(data.data || []));
       } catch (error) {
         console.error('Failed to fetch all regions ZORI:', error);
       } finally {
@@ -282,7 +307,7 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/market-data/price-cuts-all', { cache: 'no-store' });
         const data = await res.json();
-        setAllRegionsPriceCuts(data.data || []);
+        setAllRegionsPriceCuts(deduplicateByDate(data.data || []));
       } catch (error) {
         console.error('Failed to fetch all regions Price Cuts:', error);
       } finally {
@@ -300,7 +325,7 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/market-data/listings-sales-all', { cache: 'no-store' });
         const data = await res.json();
-        setAllRegionsListingsSales(data.data || []);
+        setAllRegionsListingsSales(deduplicateByDate(data.data || []));
       } catch (error) {
         console.error('Failed to fetch all regions Listings & Sales:', error);
       } finally {
@@ -318,7 +343,7 @@ export default function DashboardPage() {
       try {
         const res = await fetch('/api/market-data/forecasts-all', { cache: 'no-store' });
         const data = await res.json();
-        setAllRegionsForecasts(data.data || []);
+        setAllRegionsForecasts(deduplicateByDate(data.data || []));
       } catch (error) {
         console.error('Failed to fetch all regions Forecasts:', error);
       } finally {
@@ -375,6 +400,26 @@ export default function DashboardPage() {
   const displayZHVI = history?.zhvi?.length > 0 
     ? history.zhvi[history.zhvi.length - 1].value 
     : (latest?.zhvi || 0);
+
+  const displayZORI = history?.zori?.length > 0 
+    ? history.zori[history.zori.length - 1].value 
+    : (latest?.zori || 0);
+
+  const displayPriceCuts = history?.priceCuts?.length > 0 
+    ? history.priceCuts[history.priceCuts.length - 1].value 
+    : (latest?.priceCuts || 0);
+
+  const displayForecast = history?.forecasts?.length > 0 
+    ? history.forecasts[history.forecasts.length - 1].value 
+    : (latest?.forecast || 0);
+
+  const displayNewListings = history?.newListings?.length > 0 
+    ? history.newListings[history.newListings.length - 1].value 
+    : 0;
+
+  const displaySalesCount = history?.salesCount?.length > 0 
+    ? history.salesCount[history.salesCount.length - 1].value 
+    : 0;
 
   return (
     <div className="container mx-auto py-12 px-4 max-w-7xl">
@@ -473,7 +518,13 @@ export default function DashboardPage() {
                 Single-Family Homes Time Series - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
               </p>
             </div>
-            <Badge variant="secondary" className="text-xs">Official Index</Badge>
+            <div className="flex items-center gap-3">
+              {selectedRegion !== 'Las Vegas' && (
+                <Badge variant="outline" className="bg-blue-500/5 border-blue-200 text-blue-600 font-bold px-3 py-1 text-3xl">
+                  ${displayZHVI.toLocaleString()}
+                </Badge>
+              )}
+            </div>
           </div>
           
           <div className="h-[400px] w-full mt-4">
@@ -500,7 +551,7 @@ export default function DashboardPage() {
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip content={<ZhviTooltip />} />
+                  <Tooltip wrapperStyle={{ zIndex: 100 }} content={<ZhviTooltip />} />
                   <Legend 
                     wrapperStyle={{ paddingTop: '20px' }}
                     iconType="line"
@@ -590,6 +641,7 @@ export default function DashboardPage() {
                       tickLine={false}
                     />
                     <Tooltip 
+                      wrapperStyle={{ zIndex: 100 }}
                       contentStyle={{ 
                         backgroundColor: '#fff', 
                         borderRadius: '8px', 
@@ -606,7 +658,15 @@ export default function DashboardPage() {
                       strokeWidth={3} 
                       dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
                       activeDot={{ r: 6, strokeWidth: 0 }}
-                    />
+                    >
+                      <LabelList 
+                        dataKey="value" 
+                        position="top" 
+                        offset={15} 
+                        formatter={(val: number) => `$${(val / 1000).toFixed(0)}k`}
+                        style={{ fontSize: '11px', fontWeight: 600, fill: '#3b82f6' }}
+                      />
+                    </Line>
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -647,7 +707,13 @@ export default function DashboardPage() {
                   Monthly Observed Rent - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
                 </p>
               </div>
-              <Badge variant="secondary" className="text-xs">Per Month</Badge>
+              <div className="flex items-center gap-3">
+                {selectedRegion !== 'Las Vegas' && (
+                  <Badge variant="outline" className="bg-purple-500/5 border-purple-200 text-purple-600 font-bold px-3 py-1 text-3xl">
+                    ${displayZORI.toLocaleString()}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
@@ -675,7 +741,7 @@ export default function DashboardPage() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<ZoriTooltip />} />
+                    <Tooltip wrapperStyle={{ zIndex: 100 }} content={<ZoriTooltip />} />
                     <Legend 
                       wrapperStyle={{ paddingTop: '20px' }}
                       iconType="line"
@@ -767,6 +833,7 @@ export default function DashboardPage() {
                         tickLine={false}
                       />
                       <Tooltip 
+                        wrapperStyle={{ zIndex: 100 }}
                         formatter={(value: any) => [`$${value.toLocaleString()}`, selectedRegion]}
                         labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                       />
@@ -777,7 +844,15 @@ export default function DashboardPage() {
                         fillOpacity={1} 
                         fill={`url(#colorZori-${selectedRegion})`} 
                         strokeWidth={2} 
-                      />
+                      >
+                        <LabelList 
+                          dataKey="value" 
+                          position="top" 
+                          offset={15} 
+                          formatter={(val: number) => `$${val.toLocaleString()}`}
+                          style={{ fontSize: '11px', fontWeight: 600, fill: '#8b5cf6' }}
+                        />
+                      </Area>
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
@@ -814,7 +889,13 @@ export default function DashboardPage() {
                   % of Listings with Price Reductions - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
                 </p>
               </div>
-              <Badge variant="secondary" className="text-xs">Market Signal</Badge>
+              <div className="flex items-center gap-3">
+                {selectedRegion !== 'Las Vegas' && (
+                  <Badge variant="outline" className="bg-amber-500/5 border-amber-200 text-amber-600 font-bold px-3 py-1 text-3xl">
+                    {(displayPriceCuts * 100).toFixed(1)}%
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
@@ -842,7 +923,7 @@ export default function DashboardPage() {
                         axisLine={false}
                         tickLine={false}
                       />
-                      <Tooltip content={<PriceCutsTooltip />} />
+                      <Tooltip wrapperStyle={{ zIndex: 100 }} content={<PriceCutsTooltip />} />
                       <Legend 
                         wrapperStyle={{ paddingTop: '20px' }}
                         iconType="line"
@@ -928,6 +1009,7 @@ export default function DashboardPage() {
                         tickLine={false}
                       />
                       <Tooltip 
+                        wrapperStyle={{ zIndex: 100 }}
                         formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, selectedRegion]}
                         labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                       />
@@ -937,7 +1019,15 @@ export default function DashboardPage() {
                         stroke="#f59e0b" 
                         strokeWidth={3} 
                         dot={{ r: 4 }} 
-                      />
+                      >
+                        <LabelList 
+                          dataKey="value" 
+                          position="top" 
+                          offset={15} 
+                          formatter={(val: number) => `${(val * 100).toFixed(1)}%`}
+                          style={{ fontSize: '11px', fontWeight: 600, fill: '#f59e0b' }}
+                        />
+                      </Line>
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
@@ -975,7 +1065,13 @@ export default function DashboardPage() {
                   Market Liquidity & Volume - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
                 </p>
               </div>
-              <Badge variant="secondary" className="text-xs">Market Signal</Badge>
+              <div className="flex items-center gap-3">
+                {selectedRegion !== 'Las Vegas' && (
+                  <Badge variant="outline" className="bg-blue-500/5 border-blue-200 text-blue-600 font-bold px-3 py-1 text-3xl">
+                    {displayNewListings.toLocaleString()} List / {displaySalesCount.toLocaleString()} Sold
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
@@ -1002,7 +1098,8 @@ export default function DashboardPage() {
                         axisLine={false}
                         tickLine={false}
                       />
-                      <Tooltip 
+                      <Tooltip
+                        wrapperStyle={{ zIndex: 100 }}
                         labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                         formatter={(value: any, name: any) => {
                           const nameStr = name || '';
@@ -1072,11 +1169,16 @@ export default function DashboardPage() {
                         tickLine={false}
                       />
                       <Tooltip 
+                        wrapperStyle={{ zIndex: 100 }}
                         labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                       />
                       <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
-                      <Bar dataKey="newListings" name="New Listings" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="salesCount" name="Sales Count" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="newListings" name="New Listings" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="newListings" position="top" style={{ fontSize: '10px', fill: '#3b82f6', fontWeight: 600 }} />
+                      </Bar>
+                      <Bar dataKey="salesCount" name="Sales Count" fill="#10b981" radius={[4, 4, 0, 0]}>
+                        <LabelList dataKey="salesCount" position="top" style={{ fontSize: '10px', fill: '#10b981', fontWeight: 600 }} />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
@@ -1113,7 +1215,13 @@ export default function DashboardPage() {
                 1-Year Projected Appreciation - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
               </p>
             </div>
-            <Badge variant="secondary" className="text-xs">Projected Growth</Badge>
+            <div className="flex items-center gap-3">
+              {selectedRegion !== 'Las Vegas' && (
+                <Badge variant="outline" className="bg-emerald-500/5 border-emerald-200 text-emerald-600 font-bold px-3 py-1 text-3xl">
+                  {(displayForecast * 100).toFixed(1)}%
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
@@ -1141,7 +1249,7 @@ export default function DashboardPage() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<ForecastsTooltip />} />
+                    <Tooltip wrapperStyle={{ zIndex: 100 }} content={<ForecastsTooltip />} />
                     <Legend 
                       wrapperStyle={{ paddingTop: '20px' }}
                       iconType="line"
@@ -1227,6 +1335,7 @@ export default function DashboardPage() {
                       tickLine={false}
                     />
                     <Tooltip 
+                      wrapperStyle={{ zIndex: 100 }}
                       formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, selectedRegion]}
                       labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                     />
@@ -1236,7 +1345,15 @@ export default function DashboardPage() {
                       stroke="#10b981" 
                       strokeWidth={3} 
                       dot={{ r: 4 }} 
-                    />
+                    >
+                      <LabelList 
+                        dataKey="value" 
+                        position="top" 
+                        offset={15} 
+                        formatter={(val: number) => `${(val * 100).toFixed(1)}%`}
+                        style={{ fontSize: '11px', fontWeight: 600, fill: '#10b981' }}
+                      />
+                    </Line>
                   </LineChart>
                 </ResponsiveContainer>
               ) : (

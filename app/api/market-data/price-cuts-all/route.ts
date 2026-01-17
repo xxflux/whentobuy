@@ -11,7 +11,7 @@ export async function GET() {
         .from('zillow_price_cuts')
         .select('value, indicator_date, region_name')
         .ilike('region_name', region)
-        .gte('indicator_date', '2025-01-01')
+        .gte('indicator_date', '2025-02-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
         .order('indicator_date', { ascending: true })
         .limit(1000);
@@ -29,13 +29,31 @@ export async function GET() {
     // Transform data to combine all regions by date
     const dateMap = new Map<string, Record<string, number>>();
 
+    // Helper function to normalize date to YYYY-MM-DD format
+    const normalizeDate = (dateStr: string): string => {
+      if (!dateStr) return dateStr;
+      // Extract YYYY-MM-DD from date string (handles both "2025-01-01" and "2025-01-01T00:00:00" formats)
+      const dateOnly = dateStr.split('T')[0];
+      return dateOnly;
+    };
+
     allRegionData.forEach(({ region, data }) => {
+      // Deduplicate by date for each region (keep the latest value if duplicates exist)
+      const regionDateMap = new Map<string, number>();
       data.forEach((item: any) => {
-        const date = item.indicator_date;
+        const date = normalizeDate(item.indicator_date);
+        if (date) {
+          // Keep the latest value for each date (since data is ordered ascending)
+          regionDateMap.set(date, Number(item.value));
+        }
+      });
+      
+      // Now add to the main dateMap
+      regionDateMap.forEach((value, date) => {
         if (!dateMap.has(date)) {
           dateMap.set(date, { date });
         }
-        dateMap.get(date)![region] = Number(item.value);
+        dateMap.get(date)![region] = value;
       });
     });
 
