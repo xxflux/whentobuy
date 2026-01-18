@@ -245,7 +245,6 @@ export default function DashboardPage() {
     'Las Vegas',
     'Summerlin',
     'Henderson',
-    'Southwest',
     'Enterprise'
   ];
 
@@ -519,7 +518,7 @@ export default function DashboardPage() {
               <Badge variant="outline" className="border-amber-500/50 text-amber-600 text-sm">Sensitive Market</Badge>
             </div>
             <h1 className="text-5xl font-bold tracking-tight">Las Vegas Investment Portal</h1>
-            <p className="text-xl text-muted-foreground mt-2 max-w-2xl">
+            <p className="text-xl text-muted-foreground mt-2 w-full">
               Real-time monitoring of Las Vegas housing trends, federal policy shifts, and AI-powered entry/exit timing.
             </p>
           </div>
@@ -677,16 +676,6 @@ export default function DashboardPage() {
                     dot={false}
                     activeDot={{ r: 5 }}
                     name="Henderson"
-                  />
-                  {/* Southwest - Orange */}
-                  <Line 
-                    type="monotone" 
-                    dataKey="Southwest" 
-                    stroke="#f59e0b" 
-                    strokeWidth={2.5} 
-                    dot={false}
-                    activeDot={{ r: 5 }}
-                    name="Southwest"
                   />
                   {/* Enterprise - Red */}
                   <Line 
@@ -1050,16 +1039,6 @@ export default function DashboardPage() {
                         activeDot={{ r: 5 }}
                         name="Henderson"
                       />
-                      {/* Southwest - Orange */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="Southwest" 
-                        stroke="#f59e0b" 
-                        strokeWidth={2.5} 
-                        dot={false}
-                        activeDot={{ r: 5 }}
-                        name="Southwest"
-                      />
                       {/* Enterprise - Red */}
                       <Line 
                         type="monotone" 
@@ -1223,13 +1202,11 @@ export default function DashboardPage() {
                       <Bar dataKey="Las Vegas_newListings" name="Las Vegas_newListings" fill="#3b82f6" radius={[4, 4, 0, 0]} yAxisId="left" />
                       <Bar dataKey="Summerlin_newListings" name="Summerlin_newListings" fill="#8b5cf6" radius={[4, 4, 0, 0]} yAxisId="left" />
                       <Bar dataKey="Henderson_newListings" name="Henderson_newListings" fill="#10b981" radius={[4, 4, 0, 0]} yAxisId="left" />
-                      <Bar dataKey="Southwest_newListings" name="Southwest_newListings" fill="#f59e0b" radius={[4, 4, 0, 0]} yAxisId="left" />
                       <Bar dataKey="Enterprise_newListings" name="Enterprise_newListings" fill="#ef4444" radius={[4, 4, 0, 0]} yAxisId="left" />
                       {/* Sales Count lines for each district */}
                       <Line type="monotone" dataKey="Las Vegas_salesCount" name="Las Vegas_salesCount" stroke="#3b82f6" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
                       <Line type="monotone" dataKey="Summerlin_salesCount" name="Summerlin_salesCount" stroke="#8b5cf6" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
                       <Line type="monotone" dataKey="Henderson_salesCount" name="Henderson_salesCount" stroke="#10b981" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
-                      <Line type="monotone" dataKey="Southwest_salesCount" name="Southwest_salesCount" stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
                       <Line type="monotone" dataKey="Enterprise_salesCount" name="Enterprise_salesCount" stroke="#ef4444" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -1378,16 +1355,6 @@ export default function DashboardPage() {
                       dot={false}
                       activeDot={{ r: 5 }}
                       name="Henderson"
-                    />
-                    {/* Southwest - Orange */}
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="Southwest" 
-                      stroke="#f59e0b" 
-                      strokeWidth={2.5} 
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                      name="Southwest"
                     />
                     {/* Enterprise - Red */}
                     <Line 

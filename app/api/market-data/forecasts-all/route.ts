@@ -4,7 +4,7 @@ import { supabase } from '@/common/lib/supabase-client';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const REGIONS = ['Las Vegas', 'Summerlin', 'Henderson', 'Southwest', 'Enterprise'];
+const REGIONS = ['Las Vegas', 'Summerlin', 'Henderson', 'Enterprise'];
 
 export async function GET() {
   try {
