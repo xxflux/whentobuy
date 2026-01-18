@@ -10,6 +10,8 @@ export function HeaderNavigation() {
     const navItems = [
         { href: '/', label: 'Home' },
         { href: '/dashboard', label: 'Dashboard' },
+        { href: '/cron-status', label: 'Cron Status' },
+        { href: '/redfin-data', label: 'Redfin Data' },
         { href: '/design-system', label: 'Design System' },
     ];
 

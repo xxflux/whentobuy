@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@/common/ui';
 import { HeaderNavigation } from '@/common/components';
 import { ThemeProvider } from 'next-themes';
+import { Toaster } from '@/common/ui/toaster-component';
 import type { Metadata } from 'next';
 
 import '@fontsource/ibm-plex-sans/400.css';
@@ -29,6 +30,7 @@ export default function RootLayout({
                         <TooltipProvider>
                             <main className="flex-1">{children}</main>
                         </TooltipProvider>
+                        <Toaster />
                     </div>
                 </ThemeProvider>
             </body>
