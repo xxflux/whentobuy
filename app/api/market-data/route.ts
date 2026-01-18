@@ -23,8 +23,7 @@ export async function GET(req: Request) {
       zori,
       priceCuts,
       newListings,
-      salesCount,
-      forecasts
+      salesCount
     ] = await Promise.all([
       supabase.from('market_metrics')
         .select('value, metric_date')
@@ -91,13 +90,6 @@ export async function GET(req: Request) {
         .eq('state_name', 'NV')
         .gte('indicator_date', '2025-01-01')
         .lte('indicator_date', new Date().toISOString().split('T')[0])
-        .order('indicator_date', { ascending: true })
-        .limit(1000),
-      supabase.from('zillow_forecasts')
-        .select('value, indicator_date')
-        .ilike('region_name', normalizedRegion)
-        .eq('state_name', 'NV')
-        .gte('indicator_date', '2025-01-01')
         .order('indicator_date', { ascending: true })
         .limit(1000)
     ]);
@@ -170,7 +162,6 @@ export async function GET(req: Request) {
           priceCuts: Number(priceCuts.data?.[priceCuts.data.length - 1]?.value || 0),
           newListings: Number(newListings.data?.[newListings.data.length - 1]?.value || 0),
           salesCount: Number(salesCount.data?.[salesCount.data.length - 1]?.value || 0),
-          forecast: Number(forecasts.data?.[forecasts.data.length - 1]?.value || 0),
           date: today
         },
         history: {
@@ -182,8 +173,7 @@ export async function GET(req: Request) {
           zori: zori.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
           priceCuts: priceCuts.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
           newListings: newListings.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-          salesCount: salesCount.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || [],
-          forecasts: forecasts.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || []
+          salesCount: salesCount.data?.map(d => ({ value: Number(d.value), date: d.indicator_date })) || []
         }
       });
     }
@@ -195,7 +185,6 @@ export async function GET(req: Request) {
     if (priceCuts.error) console.error('PriceCuts query error:', priceCuts.error);
     if (newListings.error) console.error('NewListings query error:', newListings.error);
     if (salesCount.error) console.error('SalesCount query error:', salesCount.error);
-    if (forecasts.error) console.error('Forecasts query error:', forecasts.error);
     
     console.log(`[Market Data] Region: ${normalizedRegion}, ZHVI rows: ${zhvi.data?.length || 0}, ZORI rows: ${zori.data?.length || 0}, PriceCuts rows: ${priceCuts.data?.length || 0}`);
     if (zhvi.data && zhvi.data.length > 0) {
@@ -211,7 +200,6 @@ export async function GET(req: Request) {
     const latestPriceCuts = priceCuts.data && priceCuts.data.length > 0 ? priceCuts.data[priceCuts.data.length - 1] : null;
     const latestNewListings = newListings.data && newListings.data.length > 0 ? newListings.data[newListings.data.length - 1] : null;
     const latestSalesCount = salesCount.data && salesCount.data.length > 0 ? salesCount.data[salesCount.data.length - 1] : null;
-    const latestForecast = forecasts.data && forecasts.data.length > 0 ? forecasts.data[forecasts.data.length - 1] : null;
 
     // Helper function to normalize date to YYYY-MM-DD format
     const normalizeDate = (dateStr: string | null | undefined): string => {
@@ -244,7 +232,6 @@ export async function GET(req: Request) {
         priceCuts: Number(latestPriceCuts?.value || 0),
         newListings: Number(latestNewListings?.value || 0),
         salesCount: Number(latestSalesCount?.value || 0),
-        forecast: Number(latestForecast?.value || 0),
         date: normalizeDate(latestPrice?.metric_date)
       },
       history: {
@@ -256,8 +243,7 @@ export async function GET(req: Request) {
         zori: deduplicateByDate(zori.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
         priceCuts: deduplicateByDate(priceCuts.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
         newListings: deduplicateByDate(newListings.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
-        salesCount: deduplicateByDate(salesCount.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || []),
-        forecasts: deduplicateByDate(forecasts.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || [])
+        salesCount: deduplicateByDate(salesCount.data?.map(d => ({ value: Number(d.value), date: normalizeDate(d.indicator_date) })) || [])
       }
     });
   } catch (error: any) {

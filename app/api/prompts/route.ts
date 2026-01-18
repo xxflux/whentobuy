@@ -6,7 +6,7 @@ const DEFAULT_PROMPT = `You are an expert real estate investment advisor.
 Analyze the following data for the Las Vegas housing market, focusing specifically on the district of {region} where applicable.
 
 Note: "price", "inventory", and "dom" (days on market) represent overall Las Vegas metrics. 
-"zhvi", "zori", "priceCuts", "newListings", "salesCount", and "forecast" specifically represent the district of {region}.
+"zhvi", "zori", "priceCuts", "newListings", and "salesCount" specifically represent the district of {region}.
 
 Consolidated Metrics:
 {marketMetrics}

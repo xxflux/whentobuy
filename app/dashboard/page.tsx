@@ -147,48 +147,6 @@ const PriceCutsTooltip = (props: any) => {
   );
 };
 
-// Custom tooltip for Forecasts that sorts districts by value (highest first)
-const ForecastsTooltip = (props: any) => {
-  const { active, payload, label } = props;
-  
-  if (!active || !payload || payload.length === 0) {
-    return null;
-  }
-
-  // Sort payload by value (descending - highest first)
-  const sortedPayload = [...payload].sort((a: any, b: any) => {
-    const aValue = a.value as number || 0;
-    const bValue = b.value as number || 0;
-    return bValue - aValue;
-  });
-
-  return (
-    <div style={{
-      backgroundColor: '#fff',
-      borderRadius: '8px',
-      border: '1px solid #e5e7eb',
-      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-      padding: '12px'
-    }}>
-      <p style={{ marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
-        {new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-      </p>
-      {sortedPayload.map((entry: any, index: number) => (
-        <p key={index} style={{ 
-          margin: '4px 0', 
-          fontSize: '13px',
-          color: entry.color 
-        }}>
-          <span style={{ fontWeight: 500 }}>{entry.name}:</span>{' '}
-          <span style={{ fontWeight: 600 }}>
-            {(Number(entry.value) * 100).toFixed(1)}%
-          </span>
-        </p>
-      ))}
-    </div>
-  );
-};
-
 // Helper function to deduplicate data by date
 const deduplicateByDate = (data: any[]): any[] => {
   if (!data || data.length === 0) return [];
@@ -235,8 +193,6 @@ export default function DashboardPage() {
   const [loadingPriceCuts, setLoadingPriceCuts] = useState(true);
   const [allRegionsListingsSales, setAllRegionsListingsSales] = useState<any[]>([]);
   const [loadingListingsSales, setLoadingListingsSales] = useState(true);
-  const [allRegionsForecasts, setAllRegionsForecasts] = useState<any[]>([]);
-  const [loadingForecasts, setLoadingForecasts] = useState(true);
   const [analysisHistory, setAnalysisHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [recentAnalysis, setRecentAnalysis] = useState<any>(null);
@@ -339,24 +295,6 @@ export default function DashboardPage() {
     }
 
     fetchAllListingsSales();
-  }, []);
-
-  // Fetch all regions Forecasts data
-  useEffect(() => {
-    async function fetchAllForecasts() {
-      setLoadingForecasts(true);
-      try {
-        const res = await fetch('/api/market-data/forecasts-all', { cache: 'no-store' });
-        const data = await res.json();
-        setAllRegionsForecasts(deduplicateByDate(data.data || []));
-      } catch (error) {
-        console.error('Failed to fetch all regions Forecasts:', error);
-      } finally {
-        setLoadingForecasts(false);
-      }
-    }
-
-    fetchAllForecasts();
   }, []);
 
   // Fetch analysis history and most recent analysis
@@ -495,10 +433,6 @@ export default function DashboardPage() {
     ? history.priceCuts[history.priceCuts.length - 1].value 
     : (latest?.priceCuts || 0);
 
-  const displayForecast = history?.forecasts?.length > 0 
-    ? history.forecasts[history.forecasts.length - 1].value 
-    : (latest?.forecast || 0);
-
   const displayNewListings = history?.newListings?.length > 0 
     ? history.newListings[history.newListings.length - 1].value 
     : 0;
@@ -570,6 +504,222 @@ export default function DashboardPage() {
             chartData={history?.dom}
             showXAxis={true}
           />
+        </div>
+
+        {/* Price Cut Share & Sales Count - Metro Level */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Price Cut Share Chart - Metro Level */}
+          <div className="bg-card text-card-foreground rounded-xl border p-6 shadow-subtle-md relative">
+          {(loadingPriceCuts || (selectedRegion !== 'Las Vegas' && loading)) && (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
+              <Spinner className="h-8 w-8" />
+            </div>
+          )}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-2xl font-bold">Price Cut Share</h3>
+              <p className="text-muted-foreground mt-1">
+                % of Listings with Price Reductions - Las Vegas Metro, NV
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="bg-amber-500/5 border-amber-200 text-amber-600 font-bold px-3 py-1 text-3xl">
+                {(displayPriceCuts * 100).toFixed(1)}%
+              </Badge>
+            </div>
+          </div>
+
+          <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
+            <p><strong>What it is:</strong> The percentage of active listings that have had a price reduction.</p>
+            <p><strong>Why it's useful:</strong> This is a <strong>leading indicator</strong>. A rising share of price cuts signals a cooling market <em>before</em> sale prices drop, helping you time your entry or exit perfectly.</p>
+            <p className="text-muted-foreground italic text-xs border-t pt-2 mt-2">
+              <strong>Note:</strong> Price Cut Share is provided at the Metro level by Zillow, not district-specific.
+            </p>
+          </div>
+
+          <div className="h-[300px] w-full">
+            {allRegionsPriceCuts.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={allRegionsPriceCuts} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { month: 'short' })}
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    domain={[0, 'dataMax + 0.1']}
+                    tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip wrapperStyle={{ zIndex: 100 }} content={<PriceCutsTooltip />} />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    iconType="line"
+                    formatter={(value) => <span style={{ fontSize: '12px', color: '#6b7280' }}>{value}</span>}
+                  />
+                  {/* Las Vegas - Blue */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Las Vegas" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Las Vegas"
+                  />
+                  {/* Summerlin - Purple */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Summerlin" 
+                    stroke="#8b5cf6" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Summerlin"
+                  />
+                  {/* Henderson - Green */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Henderson" 
+                    stroke="#10b981" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Henderson"
+                  />
+                  {/* Enterprise - Red */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="Enterprise" 
+                    stroke="#ef4444" 
+                    strokeWidth={2.5} 
+                    dot={false}
+                    activeDot={{ r: 5 }}
+                    name="Enterprise"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/10">
+                <Spinner className="h-8 w-8 mb-4 text-primary/40" />
+                <p className="text-muted-foreground font-medium">No Zillow price cuts data found for districts.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1 italic">Please ensure data is seeded for all districts.</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-1 pt-2 border-t flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Source:</span>
+            <a 
+              href="https://www.zillow.com/research/data/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground/80 hover:text-primary transition-colors underline decoration-dotted underline-offset-2"
+            >
+              Zillow Research (Price Cuts)
+            </a>
+          </div>
+          </div>
+
+          {/* Sales Count Chart - Metro Level */}
+          <div className="bg-card text-card-foreground rounded-xl border p-6 shadow-subtle-md relative">
+          {(loadingListingsSales || (selectedRegion !== 'Las Vegas' && loading)) && (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
+              <Spinner className="h-8 w-8" />
+            </div>
+          )}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-2xl font-bold">Sales Count</h3>
+              <p className="text-muted-foreground mt-1">
+                Completed Sales - Las Vegas Metro, NV
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="bg-blue-500/5 border-blue-200 text-blue-600 font-bold px-3 py-1 text-3xl">
+                {displaySalesCount.toLocaleString()} Sold
+              </Badge>
+            </div>
+          </div>
+
+          <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
+            <p><strong>What it is:</strong> The number of completed home sales in the Las Vegas Metro area.</p>
+            <p><strong>Why it's useful:</strong> Measures <strong>liquidity</strong>. You want to invest where houses are moving. If sales count drops, it signals reduced market activity which could pressure prices down.</p>
+            <p className="text-muted-foreground italic text-xs border-t pt-2 mt-2">
+              <strong>Note:</strong> Sales Count is provided at the Metro level by Zillow, not district-specific.
+            </p>
+          </div>
+
+          <div className="h-[300px] w-full">
+            {allRegionsListingsSales.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={allRegionsListingsSales} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { month: 'short' })}
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    wrapperStyle={{ zIndex: 100 }}
+                    labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    formatter={(value: any, name: any) => {
+                      const nameStr = name || '';
+                      if (nameStr.includes('_salesCount')) {
+                        const region = nameStr.replace('_salesCount', '');
+                        return [value?.toLocaleString() || 0, `${region} - Sales`];
+                      }
+                      return [value, nameStr];
+                    }}
+                  />
+                  <Legend 
+                    iconType="line" 
+                    wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }}
+                    formatter={(value) => {
+                      if (value.includes('_salesCount')) {
+                        return value.replace('_salesCount', ' - Sales');
+                      }
+                      return value;
+                    }}
+                  />
+                  {/* Sales Count lines for each district */}
+                  <Line type="monotone" dataKey="Las Vegas_salesCount" name="Las Vegas_salesCount" stroke="#3b82f6" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
+                  <Line type="monotone" dataKey="Summerlin_salesCount" name="Summerlin_salesCount" stroke="#8b5cf6" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
+                  <Line type="monotone" dataKey="Henderson_salesCount" name="Henderson_salesCount" stroke="#10b981" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
+                  <Line type="monotone" dataKey="Enterprise_salesCount" name="Enterprise_salesCount" stroke="#ef4444" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/10">
+                <Spinner className="h-8 w-8 mb-4 text-primary/40" />
+                <p className="text-muted-foreground font-medium">No Zillow sales data found.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1 italic">Please ensure data is seeded.</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-2 pt-2 border-t flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Source:</span>
+            <a 
+              href="https://www.zillow.com/research/data/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground/80 hover:text-primary transition-colors underline decoration-dotted underline-offset-2"
+            >
+              Zillow Research (Sales Count)
+            </a>
+          </div>
+          </div>
         </div>
 
         {/* Region Selector - Above Zillow Charts */}
@@ -771,10 +921,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Rental & Market Sentiment Section - Region Specific */}
-        <div className="grid gap-8 md:grid-cols-2">
-          {/* Rent Index Chart */}
-          <div className="bg-card text-card-foreground rounded-xl border p-8 shadow-subtle-md relative">
+        {/* Rental Index Section - Region Specific */}
+        <div className="bg-card text-card-foreground rounded-xl border p-8 shadow-subtle-md relative">
             {(loadingZori || (selectedRegion !== 'Las Vegas' && loading)) && (
               <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
                 <Spinner className="h-8 w-8" />
@@ -955,356 +1103,39 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Price Cuts Chart */}
-          <div className="bg-card text-card-foreground rounded-xl border p-8 shadow-subtle-md relative">
-            {(loadingPriceCuts || (selectedRegion !== 'Las Vegas' && loading)) && (
-              <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
-                <Spinner className="h-8 w-8" />
-              </div>
-            )}
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-2xl font-bold">Price Cut Share</h3>
-                <p className="text-muted-foreground mt-1">
-                  % of Listings with Price Reductions - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                {selectedRegion !== 'Las Vegas' && (
-                  <Badge variant="outline" className="bg-amber-500/5 border-amber-200 text-amber-600 font-bold px-3 py-1 text-3xl">
-                    {(displayPriceCuts * 100).toFixed(1)}%
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
-              <p><strong>What it is:</strong> The percentage of active listings that have had a price reduction.</p>
-              <p><strong>Why it's useful:</strong> This is a <strong>leading indicator</strong>. A rising share of price cuts signals a cooling market <em>before</em> sale prices drop, helping you time your entry or exit perfectly.</p>
-            </div>
-
-            <div className="h-[300px] w-full">
-              {selectedRegion === 'Las Vegas' ? (
-                allRegionsPriceCuts.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={allRegionsPriceCuts} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey="date" 
-                        tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { month: 'short' })}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        domain={[0, 'dataMax + 0.1']}
-                        tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip wrapperStyle={{ zIndex: 100 }} content={<PriceCutsTooltip />} />
-                      <Legend 
-                        wrapperStyle={{ paddingTop: '20px' }}
-                        iconType="line"
-                        formatter={(value) => <span style={{ fontSize: '12px', color: '#6b7280' }}>{value}</span>}
-                      />
-                      {/* Las Vegas - Blue */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="Las Vegas" 
-                        stroke="#3b82f6" 
-                        strokeWidth={2.5} 
-                        dot={false}
-                        activeDot={{ r: 5 }}
-                        name="Las Vegas"
-                      />
-                      {/* Summerlin - Purple */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="Summerlin" 
-                        stroke="#8b5cf6" 
-                        strokeWidth={2.5} 
-                        dot={false}
-                        activeDot={{ r: 5 }}
-                        name="Summerlin"
-                      />
-                      {/* Henderson - Green */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="Henderson" 
-                        stroke="#10b981" 
-                        strokeWidth={2.5} 
-                        dot={false}
-                        activeDot={{ r: 5 }}
-                        name="Henderson"
-                      />
-                      {/* Enterprise - Red */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="Enterprise" 
-                        stroke="#ef4444" 
-                        strokeWidth={2.5} 
-                        dot={false}
-                        activeDot={{ r: 5 }}
-                        name="Enterprise"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/10">
-                    <Spinner className="h-8 w-8 mb-4 text-primary/40" />
-                    <p className="text-muted-foreground font-medium">No Zillow price cuts data found for districts.</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1 italic">Please ensure data is seeded for all districts.</p>
-                  </div>
-                )
-              ) : (
-                // Single district view
-                history?.priceCuts && history.priceCuts.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={history.priceCuts} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey="date" 
-                        tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { month: 'short' })}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        domain={[0, 'dataMax + 0.1']}
-                        tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip 
-                        wrapperStyle={{ zIndex: 100 }}
-                        formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, selectedRegion]}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="value" 
-                        stroke="#f59e0b" 
-                        strokeWidth={3} 
-                        dot={{ r: 4 }} 
-                      >
-                        <LabelList 
-                          dataKey="value" 
-                          position="top" 
-                          offset={15} 
-                          formatter={(val: number) => `${(val * 100).toFixed(1)}%`}
-                          style={{ fontSize: '11px', fontWeight: 600, fill: '#f59e0b' }}
-                        />
-                      </Line>
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center border-2 border-dashed rounded-xl bg-muted/10 italic text-muted-foreground text-sm">
-                    Waiting for sentiment data...
-                  </div>
-                )
-              )}
-            </div>
-            <div className="mt-6 pt-4 border-t flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Source:</span>
-              <a 
-                href="https://www.zillow.com/research/data/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground/80 hover:text-primary transition-colors underline decoration-dotted underline-offset-2"
-              >
-                Zillow Research (Price Cuts)
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* New Listings & Sales Count - Full Width */}
+        {/* New Listings Chart - District Specific */}
         <div className="bg-card text-card-foreground rounded-xl border p-8 shadow-subtle-md relative">
-            {(loadingListingsSales || (selectedRegion !== 'Las Vegas' && loading)) && (
-              <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
-                <Spinner className="h-8 w-8" />
-              </div>
-            )}
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-2xl font-bold">New Listings vs Sales</h3>
-                <p className="text-muted-foreground mt-1">
-                  Market Liquidity & Volume - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                {selectedRegion !== 'Las Vegas' && (
-                  <Badge variant="outline" className="bg-blue-500/5 border-blue-200 text-blue-600 font-bold px-3 py-1 text-3xl">
-                    {displayNewListings.toLocaleString()} List / {displaySalesCount.toLocaleString()} Sold
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
-              <p><strong>What it is:</strong> The volume of new houses hitting the market vs the number of completed sales.</p>
-              <p><strong>Why it's useful:</strong> Measures <strong>liquidity</strong>. You want to invest where houses are moving. If sales count drops while listings rise, it signals an oversupply which could pressure prices down.</p>
-              <p className="text-muted-foreground italic text-xs border-t pt-2 mt-2">
-                <strong>Note:</strong> While <strong>New Listings</strong> are specific to each district, Zillow only provides <strong>Sales Count</strong> at the Metro level. Therefore, the sales volume shown represents the entire Las Vegas Metro area across all views.
-              </p>
-            </div>
-
-            <div className="h-[300px] w-full">
-              {selectedRegion === 'Las Vegas' ? (
-                allRegionsListingsSales.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={allRegionsListingsSales} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey="date" 
-                        tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { month: 'short' })}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        yAxisId="left"
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        wrapperStyle={{ zIndex: 100 }}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        formatter={(value: any, name: any) => {
-                          const nameStr = name || '';
-                          if (nameStr.includes('_newListings')) {
-                            const region = nameStr.replace('_newListings', '');
-                            return [value?.toLocaleString() || 0, `${region} - New Listings`];
-                          } else if (nameStr.includes('_salesCount')) {
-                            const region = nameStr.replace('_salesCount', '');
-                            return [value?.toLocaleString() || 0, `${region} - Sales`];
-                          }
-                          return [value, nameStr];
-                        }}
-                      />
-                      <Legend 
-                        iconType="circle" 
-                        wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }}
-                        formatter={(value) => {
-                          if (value.includes('_newListings')) {
-                            return value.replace('_newListings', ' - New Listings');
-                          } else if (value.includes('_salesCount')) {
-                            return value.replace('_salesCount', ' - Sales');
-                          }
-                          return value;
-                        }}
-                      />
-                      {/* New Listings bars for each district */}
-                      <Bar dataKey="Las Vegas_newListings" name="Las Vegas_newListings" fill="#3b82f6" radius={[4, 4, 0, 0]} yAxisId="left" />
-                      <Bar dataKey="Summerlin_newListings" name="Summerlin_newListings" fill="#8b5cf6" radius={[4, 4, 0, 0]} yAxisId="left" />
-                      <Bar dataKey="Henderson_newListings" name="Henderson_newListings" fill="#10b981" radius={[4, 4, 0, 0]} yAxisId="left" />
-                      <Bar dataKey="Enterprise_newListings" name="Enterprise_newListings" fill="#ef4444" radius={[4, 4, 0, 0]} yAxisId="left" />
-                      {/* Sales Count lines for each district */}
-                      <Line type="monotone" dataKey="Las Vegas_salesCount" name="Las Vegas_salesCount" stroke="#3b82f6" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
-                      <Line type="monotone" dataKey="Summerlin_salesCount" name="Summerlin_salesCount" stroke="#8b5cf6" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
-                      <Line type="monotone" dataKey="Henderson_salesCount" name="Henderson_salesCount" stroke="#10b981" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
-                      <Line type="monotone" dataKey="Enterprise_salesCount" name="Enterprise_salesCount" stroke="#ef4444" strokeWidth={2.5} strokeDasharray="5 5" dot={false} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/10">
-                    <Spinner className="h-8 w-8 mb-4 text-primary/40" />
-                    <p className="text-muted-foreground font-medium">No Zillow listings/sales data found for districts.</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1 italic">Please ensure data is seeded for all districts.</p>
-                  </div>
-                )
-              ) : (
-                // Single district view
-                history?.newListings && history.newListings.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={history.newListings.map((d: any, i: number) => ({
-                      date: d.date,
-                      newListings: d.value,
-                      salesCount: history.salesCount[i]?.value || 0
-                    }))} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis 
-                        dataKey="date" 
-                        tickFormatter={(str) => new Date(str).toLocaleDateString('en-US', { month: 'short' })}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip 
-                        wrapperStyle={{ zIndex: 100 }}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                      />
-                      <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
-                      <Bar dataKey="newListings" name="New Listings" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                        <LabelList dataKey="newListings" position="top" style={{ fontSize: '10px', fill: '#3b82f6', fontWeight: 600 }} />
-                      </Bar>
-                      <Bar dataKey="salesCount" name="Sales Count" fill="#10b981" radius={[4, 4, 0, 0]}>
-                        <LabelList dataKey="salesCount" position="top" style={{ fontSize: '10px', fill: '#10b981', fontWeight: 600 }} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center border-2 border-dashed rounded-xl bg-muted/10 italic text-muted-foreground text-sm">
-                    Waiting for volume data...
-                  </div>
-                )
-              )}
-            </div>
-            <div className="mt-6 pt-4 border-t flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Source:</span>
-              <a 
-                href="https://www.zillow.com/research/data/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground/80 hover:text-primary transition-colors underline decoration-dotted underline-offset-2"
-              >
-                Zillow Research (Listing & Sales)
-              </a>
-            </div>
-          </div>
-
-        {/* Market Forecasts Section */}
-        <div className="bg-card text-card-foreground rounded-xl border p-8 shadow-subtle-md relative">
-          {(loadingForecasts || (selectedRegion !== 'Las Vegas' && loading)) && (
+          {(loadingListingsSales || (selectedRegion !== 'Las Vegas' && loading)) && (
             <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
               <Spinner className="h-8 w-8" />
             </div>
           )}
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h3 className="text-2xl font-bold">Zillow Home Value Forecast</h3>
+              <h3 className="text-2xl font-bold">New Listings</h3>
               <p className="text-muted-foreground mt-1">
-                1-Year Projected Appreciation - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
+                Market Volume - {selectedRegion === 'Las Vegas' ? 'All Districts' : selectedRegion}, NV
               </p>
             </div>
             <div className="flex items-center gap-3">
               {selectedRegion !== 'Las Vegas' && (
-                <Badge variant="outline" className="bg-emerald-500/5 border-emerald-200 text-emerald-600 font-bold px-3 py-1 text-3xl">
-                  {(displayForecast * 100).toFixed(1)}%
+                <Badge variant="outline" className="bg-blue-500/5 border-blue-200 text-blue-600 font-bold px-3 py-1 text-3xl">
+                  {displayNewListings.toLocaleString()} List
                 </Badge>
               )}
             </div>
           </div>
 
           <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-muted text-sm space-y-3">
-            <p><strong>What it is:</strong> Zillow's 1-year prediction for home value growth in the region.</p>
-            <p><strong>Why it's useful:</strong> Helps you visualize future equity potential. Factoring this into your 5-6 year hold helps confirm if the location remains a strong "buy and hold" candidate.</p>
+            <p><strong>What it is:</strong> The volume of new houses hitting the market.</p>
+            <p><strong>Why it's useful:</strong> Measures <strong>supply</strong>. You want to invest where houses are moving. If listings rise significantly, it signals increased supply which could pressure prices down.</p>
           </div>
 
           <div className="h-[300px] w-full">
             {selectedRegion === 'Las Vegas' ? (
-              allRegionsForecasts.length > 0 ? (
+              allRegionsListingsSales.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={allRegionsForecasts} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
+                  <BarChart data={allRegionsListingsSales} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="date" 
@@ -1314,72 +1145,54 @@ export default function DashboardPage() {
                       tickLine={false}
                     />
                     <YAxis 
-                      domain={['dataMin - 0.01', 'dataMax + 0.01']}
-                      tickFormatter={(val) => `${(val * 100).toFixed(1)}%`}
                       tick={{ fontSize: 11, fill: '#6b7280' }}
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip wrapperStyle={{ zIndex: 100 }} content={<ForecastsTooltip />} />
+                    <Tooltip
+                      wrapperStyle={{ zIndex: 100 }}
+                      labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      formatter={(value: any, name: any) => {
+                        const nameStr = name || '';
+                        if (nameStr.includes('_newListings')) {
+                          const region = nameStr.replace('_newListings', '');
+                          return [value?.toLocaleString() || 0, `${region} - New Listings`];
+                        }
+                        return [value, nameStr];
+                      }}
+                    />
                     <Legend 
-                      wrapperStyle={{ paddingTop: '20px' }}
-                      iconType="line"
-                      formatter={(value) => <span style={{ fontSize: '12px', color: '#6b7280' }}>{value}</span>}
+                      iconType="circle" 
+                      wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }}
+                      formatter={(value) => {
+                        if (value.includes('_newListings')) {
+                          return value.replace('_newListings', ' - New Listings');
+                        }
+                        return value;
+                      }}
                     />
-                    {/* Las Vegas - Blue */}
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="Las Vegas" 
-                      stroke="#3b82f6" 
-                      strokeWidth={2.5} 
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                      name="Las Vegas"
-                    />
-                    {/* Summerlin - Purple */}
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="Summerlin" 
-                      stroke="#8b5cf6" 
-                      strokeWidth={2.5} 
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                      name="Summerlin"
-                    />
-                    {/* Henderson - Green */}
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="Henderson" 
-                      stroke="#10b981" 
-                      strokeWidth={2.5} 
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                      name="Henderson"
-                    />
-                    {/* Enterprise - Red */}
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="Enterprise" 
-                      stroke="#ef4444" 
-                      strokeWidth={2.5} 
-                      dot={false}
-                      activeDot={{ r: 5 }}
-                      name="Enterprise"
-                    />
-                  </LineChart>
+                    {/* New Listings bars for each district */}
+                    <Bar dataKey="Las Vegas_newListings" name="Las Vegas_newListings" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Summerlin_newListings" name="Summerlin_newListings" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Henderson_newListings" name="Henderson_newListings" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Enterprise_newListings" name="Enterprise_newListings" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full w-full flex flex-col items-center justify-center border-2 border-dashed rounded-xl bg-muted/10">
                   <Spinner className="h-8 w-8 mb-4 text-primary/40" />
-                  <p className="text-muted-foreground font-medium">No Zillow forecast data found for districts.</p>
+                  <p className="text-muted-foreground font-medium">No Zillow listings data found for districts.</p>
                   <p className="text-xs text-muted-foreground/60 mt-1 italic">Please ensure data is seeded for all districts.</p>
                 </div>
               )
             ) : (
               // Single district view
-              history?.forecasts && history.forecasts.length > 0 ? (
+              history?.newListings && history.newListings.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={history.forecasts} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
+                  <BarChart data={history.newListings.map((d: any) => ({
+                    date: d.date,
+                    newListings: d.value
+                  }))} margin={{ top: 10, right: 30, left: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="date" 
@@ -1389,37 +1202,23 @@ export default function DashboardPage() {
                       tickLine={false}
                     />
                     <YAxis 
-                      domain={['dataMin - 0.01', 'dataMax + 0.01']}
-                      tickFormatter={(val) => `${(val * 100).toFixed(1)}%`}
                       tick={{ fontSize: 11, fill: '#6b7280' }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <Tooltip 
                       wrapperStyle={{ zIndex: 100 }}
-                      formatter={(value: any) => [`${(value * 100).toFixed(1)}%`, selectedRegion]}
                       labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                     />
-                    <Line 
-                      type="stepAfter" 
-                      dataKey="value" 
-                      stroke="#10b981" 
-                      strokeWidth={3} 
-                      dot={{ r: 4 }} 
-                    >
-                      <LabelList 
-                        dataKey="value" 
-                        position="top" 
-                        offset={15} 
-                        formatter={(val: number) => `${(val * 100).toFixed(1)}%`}
-                        style={{ fontSize: '11px', fontWeight: 600, fill: '#10b981' }}
-                      />
-                    </Line>
-                  </LineChart>
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
+                    <Bar dataKey="newListings" name="New Listings" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="newListings" position="top" style={{ fontSize: '10px', fill: '#3b82f6', fontWeight: 600 }} />
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full w-full flex items-center justify-center border-2 border-dashed rounded-xl bg-muted/10 italic text-muted-foreground text-sm">
-                  Waiting for forecast data...
+                  Waiting for volume data...
                 </div>
               )
             )}
@@ -1432,7 +1231,7 @@ export default function DashboardPage() {
               rel="noopener noreferrer"
               className="text-xs text-muted-foreground/80 hover:text-primary transition-colors underline decoration-dotted underline-offset-2"
             >
-              Zillow Research (Forecasts)
+              Zillow Research (New Listings)
             </a>
           </div>
         </div>
